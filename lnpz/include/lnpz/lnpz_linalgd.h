@@ -593,6 +593,9 @@ namespace lnpz_linalg
     template<class T> mat<T,4,4> frustum_matrix    (T x0, T x1, T y0, T y1, T n, T f, fwd_axis a = neg_z, z_range z = neg_one_to_one);
     template<class T> mat<T,4,4> perspective_matrix(T fovy, T aspect, T n, T f, fwd_axis a = neg_z, z_range z = neg_one_to_one) { T y = n*std::tan(fovy / 2), x = y*aspect; return frustum_matrix(-x, x, -y, y, n, f, a, z); }
 
+    //Added routines
+    template<class T> lnpz_linalg::mat<T, 3, 3> localToWorld2_matrix(const vec<T,2>& translation, T scale, T angleRadians);
+
     // Provide implicit conversion between lnpz_linalg::vec<T,M> and std::array<T,M>
     template<class T> struct converter<vec<T,1>, std::array<T,1>> { vec<T,1> operator() (const std::array<T,1> & a) const { return {a[0]}; } };
     template<class T> struct converter<vec<T,2>, std::array<T,2>> { vec<T,2> operator() (const std::array<T,2> & a) const { return {a[0], a[1]}; } };
@@ -718,6 +721,24 @@ template<class T> lnpz_linalg::mat<T,4,4> lnpz_linalg::frustum_matrix(T x0, T x1
 {
     const T s = a == pos_z ? T(1) : T(-1), o = z == neg_one_to_one ? n : 0;
     return {{2*n/(x1-x0),0,0,0}, {0,2*n/(y1-y0),0,0}, {-s*(x0+x1)/(x1-x0),-s*(y0+y1)/(y1-y0),s*(f+o)/(f-n),s}, {0,0,-(n+o)*f/(f-n),0}};
+}
+
+// Added routines
+
+template<class T> lnpz_linalg::mat<T, 3, 3> localToWorld2_matrix(const lnpz_linalg::vec<T,2>& translation, T scale, T angleRadians){
+    mat<T, 3, 3> sca = identity;
+    sca[0][0] = scale;
+    sca[1][1] = scale;
+
+    mat<T, 3, 3> trf = identity;
+    trf[0][2] = translation.x;
+    trf[1][2] = translation.y;
+
+    auto co = cos(angleRadians);
+    auto si = sin(angleRadians);
+    mat<T, 3, 3> rot = { {co,-si, 0},{si,co, 0}, {0,0,1} };
+
+    return trf * rot * sca;
 }
 
 #endif

@@ -38,11 +38,22 @@
 #include <vector>
 #include <limits>
 #include <algorithm>
+#include <stdint.h>
 
 #include <lnpz/lnpz_linalgd.h>
 
 namespace lnpz{
     typedef lnpz_linalg::double2 point_t;
+    typedef lnpz_linalg::double3x3 matrix33_t;
+
+    inline point_t ApplyToPoint(const matrix33_t& m, const point_t& p) {
+        using namespace lnpz_linalg;
+        auto r0 = m.row(0);
+        auto r1 = m.row(1);
+        double x = dot(r0.xy(), p)  + r0.z;
+        double y = dot(r0.xy(), p) + r1.z;
+        return { x,y };
+    }
 
     inline point_t SmallestElements(const point_t& lhs, const point_t& rhs){
         double xelem = std::min(lhs.x, rhs.x);
@@ -64,19 +75,33 @@ struct rectangle_t {
     point_t minpoint;
     point_t maxpoint;
 
-
-    bool valid() const {
+    bool valid() const noexcept{
         return ElementsLargerThanOrEqual(maxpoint, minpoint);
     }
 
-    static rectangle_t BoundingRectangle(const std::vector<point_t>& points) {
+};
+
+struct color_t {
+    double r, g, b,a;
+    static constexpr color_t Black() { return {0., 0., 0., 1.}; }
+    static constexpr color_t Blue() { return {0., 0., 1., 1.}; }
+    static constexpr color_t Red() { return {1., 0., 0., 1.}; }
+    static constexpr color_t Yellow() { return {1., 1., 0., 1.}; }
+    static constexpr color_t Green() { return {0., 1., 0., 1.}; }
+    static constexpr color_t White() { return {1., 1., 1., 1.}; }
+};
+
+// Single line is a linestring with two points
+struct linestring_t{
+    std::vector<point_t> points;
+    
+    rectangle_t boundingRectangle() const noexcept {
         using namespace std;
         rectangle_t r;
-        r.minpoint.x = numeric_limits<double>::max();
-        r.minpoint.y = numeric_limits<double>::max();
-        r.maxpoint.x = numeric_limits<double>::min();
-        r.maxpoint.y = numeric_limits<double>::min();
-
+        constexpr double nMin = numeric_limits<double>::min();
+        constexpr double nMax = numeric_limits<double>::max();
+        r.minpoint = { nMax, nMax };
+        r.maxpoint = { nMin, nMin };
         for (const auto& p : points) {
             r.minpoint = SmallestElements(r.minpoint, p);
             r.maxpoint = LargestElements(r.maxpoint, p);
@@ -86,28 +111,46 @@ struct rectangle_t {
     }
 };
 
-struct color_t {
-    double r, g, b,a;
-    static color_t Black() { return {0., 0., 0., 1.f}; }
-    static color_t Blue() { return {0., 0., 1., 1.f}; }
-    static color_t Red() { return {1., 0., 0., 1.f}; }
-    static color_t Yellow() { return {1., 1., 0., 1.f}; }
-    static color_t Green() { return {0., 1., 0., 1.f}; }
-    static color_t White() { return {1., 1., 1., 1.f}; }
+struct polygonface_t {
+    linestring_t outerWire;
+    std::vector<linestring_t> innerWires;
 };
 
-// Single line is a linestring with two points
-struct linestring_t{
-    std::vector<point_t> points;
-    size_t material = 0;
+struct localToWorldTransform_t {
+    lnpz_linalg::double2 position = {0,0};
+    double rotation = 0.f; // radians
+    double scale = 1.f;
+
+    matrix33_t matrix() const {
+        return lnpz_linalg::localToWorld2_matrix(position, scale, rotation);
+    }
 };
 
+struct material_t{
+    color_t color = color_t::Black();
+    double lineWidth = 1.0; // pixels
+};
 
-class Context{
+enum class InstanceType {LineString, PolygonFace};
+
+class Scene {
+public:
+    struct instance_t {
+        localToWorldTransform_t localToWorld;
+        material_t material;
+        InstanceType type;
+        size_t idx; // Index to definition
+    };
+
     std::vector<linestring_t> m_lines;
+    std::vector<polygonface_t> m_polygonFaces;
+    std::vector<instance_t> m_instances;
+};
+
+#if 0
+class SceneBuilder{
 
 public:
-    const std::vector<linestring_t>& lines() const { return m_lines; }
 
     template<class X0_TYPE, class Y0_TYPE, class X1_TYPE, class Y1_TYPE>
     void addLine(const X0_TYPE& x0, const Y0_TYPE& y0, const X1_TYPE& x1, const Y1_TYPE& y1){
@@ -119,19 +162,52 @@ public:
         snd.y = static_cast<double>(y1);
         m_lines.push_back({ {fst, snd} });
     }
+};
+#endif
 
+class SimpleBuilder {
+    Scene m_scene;
+    material_t m_currentMaterial;
+
+public:
+    void setMaterial(const material_t& mat ){
+        m_currentMaterial = mat;
+    }
+
+    void addLineString(const linestring_t& ls) {
+        m_scene.m_lines.push_back(ls);
+        auto idx = m_scene.m_lines.size() - 1;
+        localToWorldTransform_t trf;
+        m_scene.m_instances.push_back({trf, m_currentMaterial, InstanceType::LineString, idx});
+    }
+    
+    void addPolygonFace(const polygonface_t& pf) {
+        m_scene.m_polygonFaces.push_back(pf);
+        auto idx = m_scene.m_polygonFaces.size() - 1;
+        localToWorldTransform_t trf;
+        m_scene.m_instances.push_back({trf, m_currentMaterial, InstanceType::PolygonFace, idx});
+    }
+
+    Scene build() const {
+        return m_scene;
+    }
 };
 
 struct SceneConfig {
     color_t background = color_t::White();
+    uint32_t outputHeightPixels = 256;
+    uint32_t paddingInPixels = 10; // padding around scene
 };
 
 class Renderer {
     SceneConfig m_sceneConfig;
 
-    inline void Draw(const Context& ctx) {
-        
-    }
+public:
+    Renderer() {}
+    Renderer(SceneConfig sceneConfig):m_sceneConfig(sceneConfig) {}
+    void setConfig() {}
+    void draw(const Scene& scene);
+    void write(const std::string& pathOut) const;
 };
 
 
