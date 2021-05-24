@@ -9,5 +9,9 @@ namespace lnpz {
 	void Renderer::write(const std::string& pathOut) const{
 
 	}
+
+	std::string Renderer::getSRGBABytes() const {
+		return {};
+	}
 }
 

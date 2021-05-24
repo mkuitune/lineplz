@@ -43,10 +43,10 @@
 #include <lnpz/lnpz_linalgd.h>
 
 namespace lnpz{
-    typedef lnpz_linalg::double2 point_t;
+    typedef lnpz_linalg::double2 point2_t;
     typedef lnpz_linalg::double3x3 matrix33_t;
 
-    inline point_t ApplyToPoint(const matrix33_t& m, const point_t& p) {
+    inline point2_t ApplyToPoint(const matrix33_t& m, const point2_t& p) {
         using namespace lnpz_linalg;
         auto r0 = m.row(0);
         auto r1 = m.row(1);
@@ -55,25 +55,25 @@ namespace lnpz{
         return { x,y };
     }
 
-    inline point_t SmallestElements(const point_t& lhs, const point_t& rhs){
+    inline point2_t SmallestElements(const point2_t& lhs, const point2_t& rhs){
         double xelem = std::min(lhs.x, rhs.x);
         double yelem = std::min(lhs.y, rhs.y);
-        return point_t(xelem, yelem);
+        return point2_t(xelem, yelem);
     }
     
-    inline point_t LargestElements(const point_t& lhs, const point_t& rhs){
+    inline point2_t LargestElements(const point2_t& lhs, const point2_t& rhs){
         double xelem = std::max(lhs.x, rhs.x);
         double yelem = std::max(lhs.y, rhs.y);
-        return point_t(xelem, yelem);
+        return point2_t(xelem, yelem);
     }
 
-    inline bool ElementsLargerThanOrEqual(const point_t& lhs, const point_t& rhs){
+    inline bool ElementsLargerThanOrEqual(const point2_t& lhs, const point2_t& rhs){
         return (lhs.x >= rhs.x) && (lhs.y >= rhs.y);
     }
 
 struct rectangle_t {
-    point_t minpoint;
-    point_t maxpoint;
+    point2_t minpoint;
+    point2_t maxpoint;
 
     bool valid() const noexcept{
         return ElementsLargerThanOrEqual(maxpoint, minpoint);
@@ -93,7 +93,7 @@ struct color_t {
 
 // Single line is a linestring with two points
 struct linestring_t{
-    std::vector<point_t> points;
+    std::vector<point2_t> points;
     
     rectangle_t boundingRectangle() const noexcept {
         using namespace std;
@@ -154,8 +154,8 @@ public:
 
     template<class X0_TYPE, class Y0_TYPE, class X1_TYPE, class Y1_TYPE>
     void addLine(const X0_TYPE& x0, const Y0_TYPE& y0, const X1_TYPE& x1, const Y1_TYPE& y1){
-        point_t fst;
-        point_t snd;
+        point2_t fst;
+        point2_t snd;
         fst.x = static_cast<double>(x0);
         fst.y = static_cast<double>(y0);
         snd.x = static_cast<double>(x1);
@@ -207,7 +207,10 @@ public:
     Renderer(SceneConfig sceneConfig):m_sceneConfig(sceneConfig) {}
     void setConfig() {}
     void draw(const Scene& scene);
+    /** Write out the current framebuffer (i.e. the pixels drawn) to a PNG file.*/
     void write(const std::string& pathOut) const;
+    /** Return byte array of the current framebuffer (i.e. the pixels drawn).*/
+    std::string getSRGBABytes() const;
 };
 
 
