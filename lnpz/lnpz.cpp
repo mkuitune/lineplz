@@ -36,15 +36,17 @@ namespace lnpz {
 									{0, 0, 1}};
 
 		// Rasterize in 4 byte floating point precision
+
 		ImageRGBA32Linear framebuffer = ImageRGBA32Linear(outputPixelWidth, outputPixelHeight);
+		framebuffer.fill(m_sceneConfig.background);
 
 		// Rasterize scene instances in order
 		for (const auto& inst : scene.m_instances) {
 			
 		}
 
-		m_framebuffer = ConvertRBGA32LinearToSrgb(framebuffer);
-
+		// Convert to 1 byte per channel SRGBA
+		m_framebuffer = ConvertRBGA32LinearToSrgba(framebuffer);
 	}
 
 	void Renderer::write(const std::string& pathOut) const{
@@ -105,7 +107,7 @@ namespace lnpz {
 		typedef Sequence1D<int> Sequence1Di;
 	}
 
-	ImageRGBA8SRGB ConvertRBGA32LinearToSrgb(const ImageRGBA32Linear& linear)
+	ImageRGBA8SRGB ConvertRBGA32LinearToSrgba(const ImageRGBA32Linear& linear)
 	{
 		ImageRGBA8SRGB res(linear.size());
 		auto seq = make_seq(linear.elementCount());

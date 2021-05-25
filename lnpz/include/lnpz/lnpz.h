@@ -323,7 +323,7 @@ namespace lnpz{
 	typedef Array2D<SRGBA> ImageRGBA8SRGB;
 	typedef Array2D<RGBAFloat32> ImageRGBA32Linear;
 
-	ImageRGBA8SRGB ConvertRBGA32LinearToSrgb(const ImageRGBA32Linear& linear);
+	ImageRGBA8SRGB ConvertRBGA32LinearToSrgba(const ImageRGBA32Linear& linear);
 
 	class SimpleBuilder {
 		Scene m_scene;
