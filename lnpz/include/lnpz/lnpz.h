@@ -43,8 +43,126 @@
 #include <lnpz/lnpz_linalgd.h>
 
 namespace lnpz{
-    typedef lnpz_linalg::double2 point2_t;
-    typedef lnpz_linalg::double3x3 matrix33_t;
+
+    template<class T>
+    class Array2D {
+        std::vector<T> m_data;
+        size_t m_dim1;
+        size_t m_dim2;
+    public:
+
+        Array2D(size_t dim1, size_t dim2)
+            :m_dim1(dim1), m_dim2(dim2), m_data(dim1* dim2) {
+        }
+
+        Array2D(size_t dim1, size_t dim2, T defaultValue)
+            :m_dim1(dim1), m_dim2(dim2), m_data(dim1* dim2, defaultValue) {
+        }
+
+        Array2D(const std::pair<size_t, size_t>& dims) :Array2D(dims.first, dims.second) {}
+
+        Array2D(const Array2D& rhs)
+            : m_data(rhs.m_data), m_dim1(rhs.m_dim1), m_dim2(rhs.m_dim2) {
+        }
+
+        Array2D(Array2D&& rhs) noexcept
+            : m_data(std::move(rhs.m_data)), m_dim1(rhs.m_dim1), m_dim2(rhs.m_dim2) {
+        }
+
+        Array2D& operator=(const Array2D& rhs)
+        {
+            m_data = rhs.m_data;
+            m_dim1 = rhs.m_dim1;
+            m_dim2 = rhs.m_dim2;
+            return *this;
+        }
+
+        Array2D& operator=(Array2D&& rhs)
+        {
+            m_data = std::move(rhs.m_data);
+            m_dim1 = rhs.m_dim1;
+            m_dim2 = rhs.m_dim2;
+            return *this;
+        }
+
+        std::vector<T>& asVector() { return m_data; }
+
+        typename std::vector<T>::iterator begin() { return m_data.begin(); }
+        typename std::vector<T>::iterator end() { return m_data.end(); }
+        typename std::vector<T>::const_iterator begin() const { return m_data.begin(); }
+        typename std::vector<T>::const_iterator end() const { return m_data.end(); }
+
+        inline size_t index2d(size_t x, size_t y) const { return (y * m_dim1) + x; }
+
+        size_t dim1() const { return m_dim1; }
+        size_t dim2() const { return m_dim2; }
+
+        std::pair<size_t, size_t> size() const { return { m_dim1, m_dim2 }; }
+
+        size_t sizeInBytes() const { return m_dim1 * m_dim2 * sizeof(T); }
+
+        size_t elementCount() const { return m_dim1 * m_dim2; }
+
+        T* data() { return m_data.data(); }
+
+        const T* data() const { return m_data.data(); }
+
+        T& at(size_t x, size_t y) noexcept { return m_data[index2d(x, y)]; }
+        const T& at(size_t x, size_t y) const noexcept { return m_data[index2d(x, y)]; }
+
+        T& at(size_t i) noexcept { return m_data[i]; }
+        const T& at(size_t i) const noexcept { return m_data[i]; }
+
+        T& at(const std::pair<size_t, size_t>& idx) noexcept { return at(idx.first, idx.second); }
+        const T& at(const std::pair<size_t, size_t>& idx) const noexcept { return at(idx.first, idx.second); }
+
+        void set(size_t x, size_t y, const T& value) noexcept { m_data[index2d(x, y)] = value; }
+        void setIfLarger(size_t x, size_t y, const T& value) noexcept { if (m_data[index2d(x, y)] < value) m_data[index2d(x, y)] = value; }
+        void setIfSmaller(size_t x, size_t y, const T& value) noexcept { if (m_data[index2d(x, y)] > value) m_data[index2d(x, y)] = value; }
+        void set(const std::pair<size_t, size_t>& idx, const T& value) { set(idx.first, idx.second, value); }
+
+        void setAll(const T& value) {
+            for (auto& v : m_data) v = value;
+        }
+
+        typedef typename std::vector<T>::const_iterator const_iterator_t;
+        typedef typename std::vector<T>::iterator iterator_t;
+
+        const_iterator_t constIteratorAt(size_t x, size_t y) const {
+            return m_data.begin() + index2d(x, y);
+        }
+
+        iterator_t iteratorAt(size_t x, size_t y) {
+            return m_data.begin() + index2d(x, y);
+        }
+
+        bool validIndex(const std::pair<size_t, size_t>& pos) const {
+            return (pos.first < m_dim1) && (pos.second < m_dim2);
+        }
+
+        void copyRowFrom(const Array2D<T>& src, std::pair<size_t, size_t> pos, std::pair<size_t, size_t> srcPos, size_t count) {
+            if (!validIndex(pos))
+                return;
+            if (!src.validIndex(srcPos))
+                return;
+
+            size_t thisCountLimit = std::min(count, m_dim1 - pos.first);
+            count = std::min(thisCountLimit, src.m_dim1 - srcPos.first);
+            const_iterator_t srcStart = src.constIteratorAt(srcPos.first, srcPos.second);
+            const_iterator_t srcEnd = srcStart + count;
+            iterator_t targetStart = iteratorAt(pos.first, pos.second);
+            std::copy(srcStart, srcEnd, targetStart);
+        }
+
+        void fill(const T& element) {
+            std::fill(m_data.begin(), m_data.end(), element);
+        }
+
+    };
+
+    typedef lnpz_linalg::double2            point2_t;
+    typedef lnpz_linalg::double3x3          matrix33_t;
+    typedef lnpz_linalg::nslab<double, 2>   rectangle_t;
 
     inline point2_t ApplyToPoint(const matrix33_t& m, const point2_t& p) {
         using namespace lnpz_linalg;
@@ -55,30 +173,61 @@ namespace lnpz{
         return { x,y };
     }
 
-    inline point2_t SmallestElements(const point2_t& lhs, const point2_t& rhs){
-        double xelem = std::min(lhs.x, rhs.x);
-        double yelem = std::min(lhs.y, rhs.y);
-        return point2_t(xelem, yelem);
-    }
-    
-    inline point2_t LargestElements(const point2_t& lhs, const point2_t& rhs){
-        double xelem = std::max(lhs.x, rhs.x);
-        double yelem = std::max(lhs.y, rhs.y);
-        return point2_t(xelem, yelem);
-    }
+struct SRGBA {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+    uint8_t a;
+};
 
-    inline bool ElementsLargerThanOrEqual(const point2_t& lhs, const point2_t& rhs){
-        return (lhs.x >= rhs.x) && (lhs.y >= rhs.y);
-    }
+/** Linear colorspace */
+struct RGBAFloat32 {
+    float r;
+    float g;
+    float b;
+    float a;
 
-struct rectangle_t {
-    point2_t minpoint;
-    point2_t maxpoint;
-
-    bool valid() const noexcept{
-        return ElementsLargerThanOrEqual(maxpoint, minpoint);
+    RGBAFloat32 premultiplyAlpha(float aa) const {
+        return { aa * r, aa * g, aa * b, aa * a };
     }
 
+    RGBAFloat32 toPremultiplied() const {
+        return { a * r, a * g, a * b, a };
+    }
+
+    bool operator==(const RGBAFloat32& c) { return r == c.r && g == c.g && b == c.b && a == c.a; }
+    uint64_t toHash() const {
+        uint16_t mv = std::numeric_limits<uint16_t>::max();
+        uint64_t rs = (uint64_t)(r * (uint64_t)mv);
+        uint64_t gs = (uint64_t)(g * (uint64_t)mv);
+        uint64_t bs = (uint64_t)(b * (uint64_t)mv);
+        uint64_t as = (uint64_t)(a * (uint64_t)mv);
+        uint64_t res = (rs << 48) | (gs << 32) | (bs << 16) | as;
+        return res;
+    }
+
+    static RGBAFloat32 CreatePremultiplied(float r, float g, float b, float a) {
+        return { r * a, g * a, b * a, a };
+    }
+
+    static RGBAFloat32 Create(float v) { return { v, v, v, 1.f }; }
+    static RGBAFloat32 Create(float r, float g, float b, float a) { return { r, g, b, a }; }
+
+    static RGBAFloat32 Transparent() { return{ 0.f, 0.f, 0.f, 0.f }; }
+
+    static RGBAFloat32 Red() { return{ 1.f, 0.f, 0.f, 1.f }; }
+    static RGBAFloat32 Green() { return{ 0.f, 1.f, 0.f, 1.f }; }
+    static RGBAFloat32 Blue() { return{ 0.f, 0.f, 1.f, 1.f }; }
+    static RGBAFloat32 Cyan() { return{ 0.f, 1.f, 1.f, 1.f }; }
+
+    static RGBAFloat32 Violet() { return{ 1.f, 0.f, 1.f, 1.f }; }
+    static RGBAFloat32 Yellow() { return{ 1.f, 1.f, 0.f, 1.f }; }
+    static RGBAFloat32 Black() { return{ 0.f, 0.f, 0.f, 1.f }; }
+    static RGBAFloat32 White() { return{ 1.f, 1.f, 1.f, 1.f }; }
+    static RGBAFloat32 Orange() { return{ 1.f, 0.65f, 0.f, 1.f }; }
+    static RGBAFloat32 Navy() { return{ 0.f, 0.0f, 0.502f, 1.f }; }
+
+    static RGBAFloat32 Pink() { return{ 1.f, 105.f / 255.f, 180.f / 255.f, 1.f }; } // Actually HotPink...
 };
 
 struct color_t {
@@ -97,16 +246,11 @@ struct linestring_t{
     
     rectangle_t boundingRectangle() const noexcept {
         using namespace std;
-        rectangle_t r;
-        constexpr double nMin = numeric_limits<double>::min();
-        constexpr double nMax = numeric_limits<double>::max();
-        r.minpoint = { nMax, nMax };
-        r.maxpoint = { nMin, nMin };
+        rectangle_t r = rectangle_t::InitializeEmpty();
         for (const auto& p : points) {
-            r.minpoint = SmallestElements(r.minpoint, p);
-            r.maxpoint = LargestElements(r.maxpoint, p);
+            r.minpoint = smallestElements(r.minpoint, p);
+            r.maxpoint = largestElements(r.maxpoint, p);
         }
-
         return r;
     }
 };
@@ -145,25 +289,28 @@ public:
     std::vector<linestring_t> m_lines;
     std::vector<polygonface_t> m_polygonFaces;
     std::vector<instance_t> m_instances;
-};
 
-#if 0
-class SceneBuilder{
+    rectangle_t getLocalBounds(const instance_t& inst) const {
+        rectangle_t r = rectangle_t::InitializeEmpty();
+        if (inst.type == InstanceType::LineString) {
+            auto rInst = m_lines[inst.idx].boundingRectangle();
+            r.coverInPlace(rInst);
+        }
+        return r;
+    }
+    
+    rectangle_t getWorldBounds(const instance_t& inst) const {
+        rectangle_t r = getLocalBounds(inst);
+        auto pmin = r.minpoint;
+        auto pmax = r.maxpoint;
+    }
 
-public:
+    rectangle_t getBounds() const {
 
-    template<class X0_TYPE, class Y0_TYPE, class X1_TYPE, class Y1_TYPE>
-    void addLine(const X0_TYPE& x0, const Y0_TYPE& y0, const X1_TYPE& x1, const Y1_TYPE& y1){
-        point2_t fst;
-        point2_t snd;
-        fst.x = static_cast<double>(x0);
-        fst.y = static_cast<double>(y0);
-        snd.x = static_cast<double>(x1);
-        snd.y = static_cast<double>(y1);
-        m_lines.push_back({ {fst, snd} });
     }
 };
-#endif
+
+typedef Array2D<SRGBA> ImageRGBA8SRGB;
 
 class SimpleBuilder {
     Scene m_scene;
@@ -202,6 +349,7 @@ struct SceneConfig {
 class Renderer {
     SceneConfig m_sceneConfig;
 
+    ImageRGBA8SRGB m_framebuffer = ImageRGBA8SRGB(10,10);
 public:
     Renderer() {}
     Renderer(SceneConfig sceneConfig):m_sceneConfig(sceneConfig) {}

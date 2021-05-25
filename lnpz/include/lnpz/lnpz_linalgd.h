@@ -512,6 +512,13 @@ namespace lnpz_linalg
     template<class T, int M> vec<T,M>    nlerp    (const vec<T,M> & a, const vec<T,M> & b, T t) { return normalize(lerp(a,b,t)); }
     template<class T, int M> vec<T,M>    slerp    (const vec<T,M> & a, const vec<T,M> & b, T t) { T th=uangle(a,b); return th == 0 ? a : a*(std::sin(th*(1-t))/std::sin(th)) + b*(std::sin(th*t)/std::sin(th)); }
 
+    // Vector utilities
+    template<class T, int M> vec<T, M>    smallestElements(const vec<T, M>& a, const vec<T, M>& b);
+    template<class T, int M> vec<T, M>    largestElements(const vec<T, M>& a, const vec<T, M>& b);
+    template<class T> bool         elementsLargerOrEqual(const vec<T, 2>& a, const vec<T, 2>& b);
+    template<class T> bool         elementsLargerOrEqual(const vec<T, 3>& a, const vec<T, 3>& b);
+
+
     // Support for quaternion algebra using 4D vectors, representing xi + yj + zk + w
     template<class T> constexpr vec<T,4> qconj(const vec<T,4> & q)                     { return {-q.x,-q.y,-q.z,q.w}; }
     template<class T> vec<T,4>           qinv (const vec<T,4> & q)                     { return qconj(q)/length2(q); }
@@ -739,6 +746,76 @@ template<class T> lnpz_linalg::mat<T, 3, 3> localToWorld2_matrix(const lnpz_lina
     mat<T, 3, 3> rot = { {co,-si, 0},{si,co, 0}, {0,0,1} };
 
     return trf * rot * sca;
+}
+template<class T, int M> lnpz_linalg::vec<T, M> lnpz_linalg::smallestElements(const vec<T, M>& a, const vec<T, M>& b) {
+	vec<T, M> res;
+	for (int i = 0; i < M; i++)
+		res[i] = std::min(a[i], b[i]);
+	return res;
+}
+
+template<class T, int M> lnpz_linalg::vec<T, M> lnpz_linalg::largestElements(const vec<T, M>& a, const vec<T, M>& b) {
+	vec<T, M> res;
+	for (int i = 0; i < M; i++)
+		res[i] = std::max(a[i], b[i]);
+	return res;
+}
+
+template<class T> bool lnpz_linalg::elementsLargerOrEqual(const vec<T, 2>& a, const vec<T, 2>& b) {
+    return (lhs.x >= rhs.x) && (lhs.y >= rhs.y);
+}
+
+template<class T> bool lnpz_linalg::elementsLargerOrEqual(const vec<T, 3>& a, const vec<T, 3>& b) {
+    return (lhs.x >= rhs.x) && (lhs.y >= rhs.y) && (lhs.z >= rhs.z);
+}
+
+//
+// Geometric utilities
+//
+
+namespace lnpz_linalg {
+    
+    template<class T, int M>
+    struct nslab {
+        typedef vec<T, M> pnt_t;
+        pnt_t minpoint;
+        pnt_t maxpoint;
+
+        bool valid() const noexcept {
+            return elementsLargerThanOrEqual(maxpoint, minpoint);
+        }
+
+        void coverInPlace(const pnt_t& p) {
+            minpoint = smallestElements(minpoint, p);
+            maxpoint = largestElements(maxpoint, p);
+        }
+
+        void coverInPlace(const nslab& r) {
+            minpoint = smallestElements(minpoint, r.minpoint);
+            maxpoint = largestElements(maxpoint, r.maxpoint);
+        }
+
+        constexpr nslab cover(const nslab& rect) const noexcept {
+            nslab res = *this;
+            res.coverInPlace(rect);
+            return res;
+        }
+
+        constexpr nslab cover(const pnt_t& p) const noexcept {
+            nslab res = *this;
+            res.coverInPlace(p);
+            return res;
+        }
+
+        static constexpr nslab InitializeEmpty() {
+            nslab r;
+            constexpr T nMin = std::numeric_limits<T>::min();
+            constexpr T nMax = std::numeric_limits<T>::max();
+            r.minpoint = pnt_t(nMax);
+            r.maxpoint = pnt_t(nMin);
+            return r;
+        }
+    };
 }
 
 #endif

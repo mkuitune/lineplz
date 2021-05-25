@@ -2,8 +2,11 @@
 
 namespace lnpz {
 
+	typedef Array2D<RGBAFloat32> ImageRGBA32Linear;
+
 	void Renderer::draw(const Scene& scene) {
 
+		// Figure out framebuffer size
 	}
 
 	void Renderer::write(const std::string& pathOut) const{
