@@ -732,7 +732,7 @@ template<class T> lnpz_linalg::mat<T,4,4> lnpz_linalg::frustum_matrix(T x0, T x1
 
 // Added routines
 
-template<class T> lnpz_linalg::mat<T, 3, 3> localToWorld2_matrix(const lnpz_linalg::vec<T,2>& translation, T scale, T angleRadians){
+template<class T> lnpz_linalg::mat<T, 3, 3> lnpz_linalg::localToWorld2_matrix(const lnpz_linalg::vec<T,2>& translation, T scale, T angleRadians){
     mat<T, 3, 3> sca = identity;
     sca[0][0] = scale;
     sca[1][1] = scale;
@@ -745,8 +745,9 @@ template<class T> lnpz_linalg::mat<T, 3, 3> localToWorld2_matrix(const lnpz_lina
     auto si = sin(angleRadians);
     mat<T, 3, 3> rot = { {co,-si, 0},{si,co, 0}, {0,0,1} };
 
-    return trf * rot * sca;
+    return mul(trf,rot,sca);
 }
+
 template<class T, int M> lnpz_linalg::vec<T, M> lnpz_linalg::smallestElements(const vec<T, M>& a, const vec<T, M>& b) {
 	vec<T, M> res;
 	for (int i = 0; i < M; i++)
@@ -776,23 +777,33 @@ template<class T> bool lnpz_linalg::elementsLargerOrEqual(const vec<T, 3>& a, co
 namespace lnpz_linalg {
     
     template<class T, int M>
-    struct nslab {
+    class nslab {
+    public:
         typedef vec<T, M> pnt_t;
+    private:
         pnt_t minpoint;
-        pnt_t maxpoint;
+        pnt_t MAXpoint;
+    public:
+
+        const pnt_t& min() const noexcept { return minpoint; }
+        const pnt_t& max() const noexcept{ return MAXpoint; }
 
         bool valid() const noexcept {
-            return elementsLargerThanOrEqual(maxpoint, minpoint);
+            return elementsLargerThanOrEqual(MAXpoint, minpoint);
         }
 
-        void coverInPlace(const pnt_t& p) {
+        void coverInPlace(const pnt_t& p) noexcept {
             minpoint = smallestElements(minpoint, p);
-            maxpoint = largestElements(maxpoint, p);
+            MAXpoint = largestElements(MAXpoint, p);
         }
 
-        void coverInPlace(const nslab& r) {
+        void coverInPlace(const nslab& r) noexcept {
             minpoint = smallestElements(minpoint, r.minpoint);
-            maxpoint = largestElements(maxpoint, r.maxpoint);
+            MAXpoint = largestElements(MAXpoint, r.MAXpoint);
+        }
+
+        constexpr pnt_t diagonal() const noexcept {
+            return MAXpoint - minpoint;
         }
 
         constexpr nslab cover(const nslab& rect) const noexcept {
@@ -809,10 +820,17 @@ namespace lnpz_linalg {
 
         static constexpr nslab InitializeEmpty() {
             nslab r;
-            constexpr T nMin = std::numeric_limits<T>::min();
-            constexpr T nMax = std::numeric_limits<T>::max();
-            r.minpoint = pnt_t(nMax);
-            r.maxpoint = pnt_t(nMin);
+            constexpr T numMin = std::numeric_limits<T>::min();
+            constexpr T numMax = std::numeric_limits<T>::max();
+            r.minpoint = pnt_t(numMax);
+            r.MAXpoint = pnt_t(numMin);
+            return r;
+        }
+        
+        static constexpr nslab InitializeFromPair(const pnt_t& p0, const pnt_t& p1) {
+            nslab r = InitializeEmpty();
+            r.coverInPlace(p0);
+            r.coverInPlace(p1);
             return r;
         }
     };
