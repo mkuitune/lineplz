@@ -78,7 +78,6 @@ namespace lnpz {
 		class Sequence1D {
 			T m_begin;
 			T m_end;
-
 		public:
 			struct const_iterator {
 				T val;
@@ -87,10 +86,8 @@ namespace lnpz {
 				const T& operator*() { return val; }
 			};
 
-			Sequence1D(T fst, T snd)
-				: m_begin(fst), m_end(snd) {}
-			Sequence1D(T snd)
-				: m_begin(0), m_end(snd) {}
+			Sequence1D(T fst, T snd) : m_begin(fst), m_end(snd) {}
+			Sequence1D(T snd) : m_begin(0), m_end(snd) {}
 			const_iterator begin() const { return { m_begin }; }
 			const_iterator end() const { return { m_end }; }
 		};
