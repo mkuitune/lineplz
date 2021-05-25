@@ -52,9 +52,15 @@ namespace lnpz {
 	}
 
 	std::string Renderer::getSRGBABytes() const {
-		return {};
-	}
+		std::string res;
+		size_t size = m_framebuffer.sizeInBytes();
+		res.resize(size);
+		const char* src = (const char*)m_framebuffer.data();
+		for (size_t i = 0; i < size; i++)
+			res[i] = src[i];
 
+		return res;
+	}
 
 	//
 	// Color
