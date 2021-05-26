@@ -2,7 +2,7 @@
 
 #include "lnpz_util.h"
 
-//#include "lnpz_quadtree.h"
+#include "lnpz_quadtree.h"
 
 #include <vector>
 #include <filesystem>
@@ -26,17 +26,40 @@
 //
 namespace lnpz{
 
-	namespace util{
+	//
+	// Image and rasterization
+	//
+	namespace internal_detail{
 		// Callback for stb_image_write
-		void write_bytes(void* context, void* data, int size) {
+		void WriteBytes(void* context, void* data, int size) {
 			std::vector<uint8_t>* bytes = (std::vector<uint8_t>*)(context);
 			uint8_t* byteData = (uint8_t*)data;
 			*bytes = std::vector<uint8_t>(byteData, byteData + size);
 		}
-	}
-}
 
-namespace lnpz {
+		void RasterizeLineString(const matrix33_t sceneToPixel, const Scene::instance_t& inst, const linestring_t& lines, ImageRGBA32Linear& framebuffer){
+			// get scenespace geometry
+			// convert to distance field in scenespace
+			// colorize distance field
+
+		}
+		
+		void RasterizePolygonFace(const matrix33_t sceneToPixel, const Scene::instance_t& inst, const polygonface_t& face, ImageRGBA32Linear& framebuffer){
+			// get scenespace geometry
+			// convert to distance field in scenespace
+			// colorize distance field
+
+		}
+
+		void RasterizeInstance(const Scene& scene, const matrix33_t sceneToPixel, const Scene::instance_t& inst, ImageRGBA32Linear& framebuffer){
+			if (inst.type == InstanceType::LineString) {
+				RasterizeLineString(sceneToPixel, inst, scene.m_lines[inst.idx], framebuffer);
+			}
+			else if (inst.type == InstanceType::PolygonFace) {
+				RasterizePolygonFace(sceneToPixel, inst, scene.m_polygonFaces[inst.idx], framebuffer);
+			}
+		}
+	}
 
 	typedef Array2D<RGBAFloat32> ImageRGBA32Linear;
 
@@ -66,7 +89,7 @@ namespace lnpz {
 
 		// Rasterize scene instances in order
 		for (const auto& inst : scene.m_instances) {
-			
+			internal_detail::RasterizeInstance(scene, sceneToPixel, inst, framebuffer);
 		}
 
 		// Convert to 1 byte per channel SRGBA
@@ -78,7 +101,7 @@ namespace lnpz {
 		int width = (int)m_framebuffer.dim1();
 		int height = (int)m_framebuffer.dim2();
 		int rowlength = 4 * width;
-		stbi_write_png_to_func(util::write_bytes, (void*)&byteArray, width, height, 4, m_framebuffer.data(), rowlength);
+		stbi_write_png_to_func(internal_detail::WriteBytes, (void*)&byteArray, width, height, 4, m_framebuffer.data(), rowlength);
 		return util::WriteBytesToPath(byteArray, pathOut);
 	}
 
@@ -96,7 +119,7 @@ namespace lnpz {
 	//
 	// Color
 	//
-	namespace {
+	namespace internal_detail{
 		uint8_t LinearFloatToSRGBUint8(const float f) {
 			return stbir__linear_to_srgb_uchar(f);
 		}
@@ -138,6 +161,7 @@ namespace lnpz {
 
 	ImageRGBA8SRGB ConvertRBGA32LinearToSrgba(const ImageRGBA32Linear& linear)
 	{
+		using namespace internal_detail;
 		ImageRGBA8SRGB res(linear.size());
 		auto seq = make_seq(linear.elementCount());
 		for (auto i : seq) {
