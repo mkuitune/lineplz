@@ -1,5 +1,14 @@
 #include <lnpz/lnpz.h>
 
+#include "lnpz_util.h"
+
+//#include "lnpz_quadtree.h"
+
+#include <vector>
+#include <filesystem>
+#include <iostream>
+#include <fstream>
+
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "stb/stb_image_resize.h"
 #undef STB_IMAGE_RESIZE_IMPLEMENTATION
@@ -11,6 +20,21 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
 #undef STB_IMAGE_IMPLEMENTATION
+
+//
+// Utilities
+//
+namespace lnpz{
+
+	namespace util{
+		// Callback for stb_image_write
+		void write_bytes(void* context, void* data, int size) {
+			std::vector<uint8_t>* bytes = (std::vector<uint8_t>*)(context);
+			uint8_t* byteData = (uint8_t*)data;
+			*bytes = std::vector<uint8_t>(byteData, byteData + size);
+		}
+	}
+}
 
 namespace lnpz {
 
@@ -35,7 +59,7 @@ namespace lnpz {
 									{0,sceneToPixelScale,  offset.y},
 									{0, 0, 1}};
 
-		// Rasterize in 4 byte floating point precision
+		// Rasterize in 4-byte floating point precision
 
 		ImageRGBA32Linear framebuffer = ImageRGBA32Linear(outputPixelWidth, outputPixelHeight);
 		framebuffer.fill(m_sceneConfig.background);
@@ -49,8 +73,13 @@ namespace lnpz {
 		m_framebuffer = ConvertRBGA32LinearToSrgba(framebuffer);
 	}
 
-	void Renderer::write(const std::string& pathOut) const{
-
+	std::string Renderer::write(const std::string& pathOut) const {
+		std::vector<uint8_t> byteArray;
+		int width = (int)m_framebuffer.dim1();
+		int height = (int)m_framebuffer.dim2();
+		int rowlength = 4 * width;
+		stbi_write_png_to_func(util::write_bytes, (void*)&byteArray, width, height, 4, m_framebuffer.data(), rowlength);
+		return util::WriteBytesToPath(byteArray, pathOut);
 	}
 
 	std::string Renderer::getSRGBABytes() const {

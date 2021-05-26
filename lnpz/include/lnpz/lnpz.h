@@ -369,7 +369,7 @@ namespace lnpz{
 		void setConfig() {}
 		void draw(const Scene& scene);
 		/** Write out the current framebuffer (i.e. the pixels drawn) to a PNG file.*/
-		void write(const std::string& pathOut) const;
+		std::string write(const std::string& pathOut) const;
 		/** Return byte array of the current framebuffer (i.e. the pixels drawn).*/
 		std::string getSRGBABytes() const;
 	};
