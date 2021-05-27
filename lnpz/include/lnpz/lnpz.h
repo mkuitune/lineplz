@@ -50,15 +50,6 @@ namespace lnpz{
 	typedef lnpz_linalg::double3x3          matrix33_t;
 	typedef lnpz_linalg::nslab<double, 2>   rectangle_t;
 
-	inline point2_t ApplyToPoint(const matrix33_t& m, const point2_t& p) {
-		using namespace lnpz_linalg;
-		auto r0 = m.row(0);
-		auto r1 = m.row(1);
-		double x = dot(r0.xy(), p) + r0.z;
-		double y = dot(r0.xy(), p) + r1.z;
-		return { x,y };
-	}
-
 	// Single line is a linestring with two points
 	struct linestring_t {
 		std::vector<point2_t> points;
@@ -131,8 +122,8 @@ namespace lnpz{
 			auto pmin = r.min();
 			auto pmax = r.max();
 			auto mat = inst.localToWorld.matrix();
-			pmin = ApplyToPoint(mat, pmin);
-			pmax = ApplyToPoint(mat, pmax);
+			pmin = apply_to_point2(mat, pmin);
+			pmax = apply_to_point2(mat, pmax);
 
 			rectangle_t wb = rectangle_t::InitializeFromPair(pmin, pmax);
 			return wb;

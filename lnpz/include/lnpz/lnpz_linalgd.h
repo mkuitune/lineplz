@@ -513,10 +513,14 @@ namespace lnpz_linalg
     template<class T, int M> vec<T,M>    slerp    (const vec<T,M> & a, const vec<T,M> & b, T t) { T th=uangle(a,b); return th == 0 ? a : a*(std::sin(th*(1-t))/std::sin(th)) + b*(std::sin(th*t)/std::sin(th)); }
 
     // Vector utilities
-    template<class T, int M> vec<T, M>    smallestElements(const vec<T, M>& a, const vec<T, M>& b);
-    template<class T, int M> vec<T, M>    largestElements(const vec<T, M>& a, const vec<T, M>& b);
-    template<class T> bool         elementsLargerOrEqual(const vec<T, 2>& a, const vec<T, 2>& b);
-    template<class T> bool         elementsLargerOrEqual(const vec<T, 3>& a, const vec<T, 3>& b);
+    template<class T, int M> vec<T, M>  smallestElements(const vec<T, M>& a, const vec<T, M>& b);
+    template<class T, int M> vec<T, M>  largestElements(const vec<T, M>& a, const vec<T, M>& b);
+    template<class T> T                 smallestElement(const vec<T, 2>& a) { return a.x < a.y ? a.x : a.y; }
+    template<class T> T                 smallestElement(const vec<T, 3>& a) {return a.x < a.y ? (a.x < a.z? a.x : a.z) : (a.y < a.z ? a.y : a.z); }
+    template<class T> T                 largestElement(const vec<T, 2>& a) { return a.x > a.y ? a.x : a.y; }
+    template<class T> T                 largestElement(const vec<T, 3>& a) {return a.x > a.y ? (a.x > a.z? a.x:a.z) :(a.y > a.z?a.y:a.z); }
+    template<class T> bool              elementsLargerOrEqual(const vec<T, 2>& a, const vec<T, 2>& b);
+    template<class T> bool              elementsLargerOrEqual(const vec<T, 3>& a, const vec<T, 3>& b);
 
 
     // Support for quaternion algebra using 4D vectors, representing xi + yj + zk + w
@@ -763,11 +767,11 @@ template<class T, int M> lnpz_linalg::vec<T, M> lnpz_linalg::largestElements(con
 }
 
 template<class T> bool lnpz_linalg::elementsLargerOrEqual(const vec<T, 2>& a, const vec<T, 2>& b) {
-    return (lhs.x >= rhs.x) && (lhs.y >= rhs.y);
+    return (a.x >= b.x) && (a.y >= b.y);
 }
 
 template<class T> bool lnpz_linalg::elementsLargerOrEqual(const vec<T, 3>& a, const vec<T, 3>& b) {
-    return (lhs.x >= rhs.x) && (lhs.y >= rhs.y) && (lhs.z >= rhs.z);
+    return (a.x >= y.x) && (a.y >= y.y) && (a.z >= y.z);
 }
 
 //
@@ -775,7 +779,27 @@ template<class T> bool lnpz_linalg::elementsLargerOrEqual(const vec<T, 3>& a, co
 //
 
 namespace lnpz_linalg {
+
+    template<class T>
+    inline vec<T,2> apply_to_point2(const mat<T,3,3>& m, const vec<T,2>& p) {
+        auto r0 = m.row(0);
+        auto r1 = m.row(1);
+        T x = dot(r0.xy(), p) + r0.z;
+        T y = dot(r1.xy(), p) + r1.z;
+        return { x,y };
+    }
     
+    template<class T>
+    inline vec<T,2> apply_to_point3(const mat<T,4,4>& m, const vec<T,3>& p) {
+        auto r0 = m.row(0);
+        auto r1 = m.row(1);
+        auto r2 = m.row(2);
+        T x = dot(r0.xyz(), p) + r0.z;
+        T y = dot(r1.xyz(), p) + r1.z;
+        T z = dot(r2.xyz(), p) + r2.z;
+        return { x,y,z};
+    }
+
     template<class T, int M>
     class nslab {
     public:
@@ -800,6 +824,18 @@ namespace lnpz_linalg {
         void coverInPlace(const nslab& r) noexcept {
             minpoint = smallestElements(minpoint, r.minpoint);
             MAXpoint = largestElements(MAXpoint, r.MAXpoint);
+        }
+
+        // Return false if the intersection is nill
+        bool intersect(const nslab& rhs, nslab& result) const{
+            bool valid = elementsLargerOrEqual(MAXpoint, rhs.minpoint) && elementsLargerOrEqual(rhs.MAXpoint, minpoint);
+            if (!valid)
+                return false;
+            auto minp = largestElements(minpoint, rhs.minpoint);
+            auto maxp = smallestElements(minpoint, rhs.minpoint);
+            result.minpoint = minp;
+            result.MAXpoint = maxp;
+            return true;
         }
 
         constexpr pnt_t diagonal() const noexcept {
