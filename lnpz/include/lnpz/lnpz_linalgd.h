@@ -742,12 +742,13 @@ template<class T> lnpz_linalg::mat<T, 3, 3> lnpz_linalg::localToWorld2_matrix(co
     sca[1][1] = scale;
 
     mat<T, 3, 3> trf = identity;
-    trf[0][2] = translation.x;
-    trf[1][2] = translation.y;
+    trf[2][0] = translation.x; // note matrix is in column major so first index is col,second is row (a bit strange)
+    trf[2][1] = translation.y;
 
     auto co = cos(angleRadians);
     auto si = sin(angleRadians);
     mat<T, 3, 3> rot = { {co,-si, 0},{si,co, 0}, {0,0,1} };
+    rot = transpose(rot); // from row to column major
 
     return mul(trf,rot,sca);
 }
@@ -832,7 +833,7 @@ namespace lnpz_linalg {
             if (!valid)
                 return false;
             auto minp = largestElements(minpoint, rhs.minpoint);
-            auto maxp = smallestElements(minpoint, rhs.minpoint);
+            auto maxp = smallestElements(MAXpoint, rhs.MAXpoint);
             result.minpoint = minp;
             result.MAXpoint = maxp;
             return true;

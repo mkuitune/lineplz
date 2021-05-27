@@ -152,6 +152,7 @@ namespace lnpz{
 			}
 		};
 
+		// TODO FIX THIS!
 		struct PolyFaceDistance{
 
 			const std::vector<point2_t>& outerWire;
@@ -417,7 +418,7 @@ namespace lnpz{
 			auto localToPixel = mul(sceneToPixel, inst.localToWorld.matrix());
 			linestring_t linesInPixels = lines;
 			for (auto& p : linesInPixels.points) {
-				apply_to_point2(localToPixel, p);
+				p = apply_to_point2(localToPixel, p);
 			}
 
 			auto frameBufferBounds = GetImageArrayBounds(framebuffer);
@@ -442,7 +443,7 @@ namespace lnpz{
 			float originy = (float)rasterizationBounds.min().y;
 			FieldQuadtreeBuilder fieldBuilder(originx, originy, maxSize);
 			// Build distance field
-			LineStringDistance dist{lines.points};
+			LineStringDistance dist{linesInPixels.points};
 			auto fun = dist.bindUnsigned();
 			fieldBuilder.add(fun);
 			auto field =  fieldBuilder.build();
@@ -458,10 +459,14 @@ namespace lnpz{
 				float x = pixelEnum.spatialx;
 				float y = pixelEnum.spatialy;
 				float dist = field.getDeepSample(x, y);
-				material.lineColorFromDistance(dist, colorTmp);
-				if (colorTmp.a > 0.001f) {
-					BlendPixelPremuli((unsigned)pixelEnum.x, (unsigned)pixelEnum.y, colorTmp, framebuffer);
-				}
+				//if (dist < 20) {
+					bool valid = material.lineColorFromDistance(dist, colorTmp);
+					if (valid) {
+						if (colorTmp.a > 0.001f) {
+							BlendPixelPremuli((unsigned)pixelEnum.x, (unsigned)pixelEnum.y, colorTmp, framebuffer);
+						}
+					}
+				//}
 			}
 
 		}
@@ -500,9 +505,11 @@ namespace lnpz{
 		const point2_t	sceneOrig(m_sceneConfig.paddingInPixels);
 		const auto		offset = sceneOrig - wb.min();
 
-		const matrix33_t sceneToPixel = { {sceneToPixelScale, 0, offset.x},
+		matrix33_t sceneToPixel = { {sceneToPixelScale, 0, offset.x},
 									{0,sceneToPixelScale,  offset.y},
 									{0, 0, 1} };
+
+		sceneToPixel = lnpz_linalg::transpose(sceneToPixel); // row to column major
 
 		// Rasterize in 4-byte floating point precision
 
