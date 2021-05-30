@@ -97,7 +97,7 @@ namespace lnpz{
 				auto dist0 = p - lines[0];
 				double d = dot(dist0,dist0);
 
-				for (size_t i = 0, j = N - 1; i < N; j = i, i++)
+				for (size_t i = 0, j = 1; j < N; j++, i++)
 				{
 					auto pi = lines[i];
 					auto pj = lines[j];
@@ -117,7 +117,7 @@ namespace lnpz{
 
 				double s = 1.0;
 
-				for (size_t i = 0, j = N - 1; i < N; j = i, i++)
+				for (size_t i = 0, j = 1; i < N; j++, i++)
 				{
 					auto pi = lines[i];
 					auto pj = lines[j];
@@ -164,22 +164,22 @@ namespace lnpz{
 #endif
 		
 			// Remember to add the last-to-start edge here
-			const std::vector<std::vector<point2_t>>& wires;
+			//const std::vector<std::vector<point2_t>>& wires;
+			const std::vector<linestring_t>& wires;
 
 			inline float unsignedDistance(const point2_t& p) const {
-				
-				auto dist = unsignedDistance(p, wires[0]);
+				auto dist = unsignedDistance(p, wires[0].points);
 				for (size_t i = 1; i < wires.size(); i++) {
-					auto idist = unsignedDistance(p, wires[i]);
+					auto idist = unsignedDistance(p, wires[i].points);
 					dist = std::min(dist, idist);
 				}
 				return dist;
 			}
 
 			inline float signedDistance(const point2_t& p) const {
-				auto dist = signedDistance(p, wires[0]);
+				auto dist = signedDistance(p, wires[0].points);
 				for (size_t i = 1; i < wires.size(); i++) {
-					auto idist = signedDistance(p, wires[i]);
+					auto idist = signedDistance(p, wires[i].points);
 					if (fabsf(idist) < fabsf(dist))
 						dist = idist;
 				}
@@ -187,14 +187,15 @@ namespace lnpz{
 
 			}
 
+			// Polygon face source data does NOT contain the last edge - that is implicit handled
+			// in rendering - and preprocessing needs to clean it so it's correct
 			inline float unsignedDistance(const point2_t& p, const std::vector<point2_t>& lines) const
 			{
 				size_t N = lines.size();
 				auto dist0 = p - lines[0];
 				double d = dot(dist0,dist0);
 
-				for (size_t i = 0, j = N - 1; i < N; j = i, i++)
-				{
+				for (size_t i = N-1, j = 0; j < N; i = j, j++) {
 					auto pi = lines[i];
 					auto pj = lines[j];
 					auto e = pj - pi;
@@ -205,6 +206,8 @@ namespace lnpz{
 				return sqrtf(d);
 			}
 
+			// Polygon face source data does NOT contain the last edge - that is implicit handled
+			// in rendering - and preprocessing needs to clean it so it's correct
 			inline float signedDistance(const point2_t& p, const std::vector<point2_t>& lines) const
 			{
 				size_t N = lines.size();
@@ -213,8 +216,7 @@ namespace lnpz{
 
 				double s = 1.0;
 
-				for (size_t i = 0, j = N - 1; i < N; j = i, i++)
-				{
+				for (size_t i = N-1, j = 0; j < N; i = j, j++){
 					auto pi = lines[i];
 					auto pj = lines[j];
 					auto e = pj - pi;
@@ -374,13 +376,17 @@ namespace lnpz{
 			}
 
 			static ColorizeMaterial2D Create(
-				const material_t& linesMaterial, const material_t& polygonMaterial) {
+				const material_t& materialIn) {
+
+				auto lineColor = materialIn.lineColor;
+				auto faceColor = materialIn.faceColor;
+
 				ColorizeMaterial2D c;
-				c.src.colorFill = polygonMaterial.color;
-				c.src.colorLine = linesMaterial.color;
-				c.src.linewidth = linesMaterial.lineWidth;
-				c.lineColorPremul = linesMaterial.color.toPremultiplied();
-				c.fillColorPremul = polygonMaterial.color.toPremultiplied();
+				c.src.colorFill = faceColor;
+				c.src.colorLine = lineColor;
+				c.src.linewidth = materialIn.lineWidth;
+				c.lineColorPremul = lineColor.toPremultiplied();
+				c.fillColorPremul = faceColor.toPremultiplied();
 				float lineWidthInRaster = c.src.linewidth;
 				c.w = lineWidthInRaster * 0.5f;
 				static const float f = 0.5f; // antialias distance/2
@@ -432,6 +438,7 @@ namespace lnpz{
 			auto frameBufferBounds = GetImageArrayBounds(framebuffer);
 
 			// Pixel bounds
+			// TODO Add linewidth !
 			auto linePixelBounds = linesInPixels.boundingRectangle();
 
 			rectangle_t rasterizationBounds;
@@ -461,7 +468,7 @@ namespace lnpz{
 			}
 			auto pixelEnum = pixelCoords.enumerate();
 
-			ColorizeMaterial2D material = ColorizeMaterial2D::Create(inst.material, inst.material);
+			ColorizeMaterial2D material = ColorizeMaterial2D::Create(inst.material);
 			RGBAFloat32 colorTmp;
 			while (pixelEnum.next()) {
 				float x = pixelEnum.spatialx;
@@ -482,16 +489,93 @@ namespace lnpz{
 		void RasterizePolygonFace(const matrix33_t sceneToPixel, 
 			const Scene::instance_t& inst, const renderablepolygonface_t& face, ImageRGBA32Linear& framebuffer) {
 			
-			// Almost same as for lines
-
-
-			// 
-
-			// get scenespace geometry
-
-
 			// convert to distance field in scenespace
 			// colorize distance field
+			auto localToPixel = mul(sceneToPixel, inst.localToWorld.matrix());
+			
+			renderablepolygonface_t faceInPixelSpace = face;
+
+			for (auto& wire : faceInPixelSpace.wires) {
+				for (auto& p : wire.points) {
+					p = apply_to_point2(localToPixel, p);
+				}
+			}
+			auto frameBufferBounds = GetImageArrayBounds(framebuffer);
+
+			// Pixel bounds
+			// TODO Add linewidth !
+			auto linePixelBounds = faceInPixelSpace.boundingRectangle();
+
+			rectangle_t rasterizationBounds;
+			if (!linePixelBounds.intersect(frameBufferBounds, rasterizationBounds)) {
+				return;
+			}
+
+			auto rasterDiagonal = rasterizationBounds.diagonal();
+			auto areaInPixels = rasterDiagonal.x * rasterDiagonal.y;
+			if (areaInPixels < 3.0 /* Some small enough cutoff */) {
+				return;
+			}
+
+			// Build adaptive signed distance tree
+			double maxSize = largestElement(rasterDiagonal);
+			float originx = (float)rasterizationBounds.min().x;
+			float originy = (float)rasterizationBounds.min().y;
+			FieldQuadtreeBuilder fieldBuilder(originx, originy, maxSize);
+			// Build distance field
+
+			//LineStringDistance dist{ linesInPixels.points };
+			PolyFaceDistance dist{ faceInPixelSpace.wires };
+
+			auto fun = dist.bindSigned();
+			fieldBuilder.add(fun);
+			auto field = fieldBuilder.build();
+			PixelCover pixelCoords;
+			if (!PixelCover::Get(rasterizationBounds, pixelCoords)) {
+				return;
+			}
+			auto pixelEnum = pixelCoords.enumerate();
+
+			ColorizeMaterial2D material = ColorizeMaterial2D::Create(inst.material);
+			RGBAFloat32 colorTmp;
+			RGBAFloat32 colorTmpArea;
+			while (pixelEnum.next()) {
+				float x = pixelEnum.spatialx;
+				float y = pixelEnum.spatialy;
+				float dist = field.getDeepSample(x, y);
+				//if (dist < 20) {
+
+				if (inst.material.lineColor.a == 0.0){ // No outline
+					if (material.fillColorFromDistance(dist, colorTmpArea)) {
+						//m_painter.BlendPixelPremuli((unsigned)x, (unsigned)y, colorTmpArea); // todo is premultiplied what we want
+						BlendPixelPremuli((unsigned)pixelEnum.x, (unsigned)pixelEnum.y, colorTmpArea, framebuffer);
+					}
+				}
+				else { // Blend outline and polygon against eachother
+					if (material.fillColorFromDistance(dist, colorTmpArea)) {
+
+						if (material.lineColorFromDistance(dist, colorTmp)) {
+							colorTmpArea = BlendPreMultipliedAlpha(colorTmp, colorTmpArea);
+						}
+
+						//m_painter.BlendPixelPremuli((unsigned)x, (unsigned)y, colorTmpArea); // todo is premultiplied what we want
+						BlendPixelPremuli((unsigned)pixelEnum.x, (unsigned)pixelEnum.y, colorTmpArea, framebuffer);
+					}
+					else {
+						if (material.lineColorFromDistance(dist, colorTmp)) {
+							BlendPixelPremuli((unsigned)pixelEnum.x, (unsigned)pixelEnum.y, colorTmp, framebuffer);
+						}
+					}
+				}
+
+
+					//Line
+					//if (colorTmp.a > 0.001f) {
+					//	BlendPixelPremuli((unsigned)pixelEnum.x, (unsigned)pixelEnum.y, colorTmp, framebuffer);
+					//}
+
+				//}
+			}
 
 		}
 
@@ -536,9 +620,12 @@ namespace lnpz{
 			//
 			// Trivial conversion for debugging purposes
 			//
+
 			res.wires.push_back(polyface.outerWire);
-			for(const auto& inw : polyface.innerWires)
-				res.wires.push_back(inw.reversed());
+			for (const auto& inw : polyface.innerWires) {
+				//res.wires.push_back(inw.reversed());
+				res.wires.push_back(inw);
+			}
 
 			return true;
 		}

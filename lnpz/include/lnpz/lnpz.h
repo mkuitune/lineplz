@@ -86,6 +86,14 @@ namespace lnpz{
 	struct renderablepolygonface_t {
 		size_t sourcePolygonIndex;
 		std::vector<linestring_t> wires;
+		
+		rectangle_t boundingRectangle() const {
+			rectangle_t r = wires[0].boundingRectangle();
+			for (const auto& w : wires) {
+				r.coverInPlace(w.boundingRectangle());
+			}
+			return r;
+		}
 	};
 
 	struct localToWorldTransform_t {
@@ -99,7 +107,8 @@ namespace lnpz{
 	};
 
 	struct material_t {
-		RGBAFloat32 color = RGBAFloat32::Black();
+		RGBAFloat32 lineColor = RGBAFloat32::Black();
+		RGBAFloat32 faceColor = RGBAFloat32::Red();
 		double lineWidth = 1.0; // pixels
 	};
 
