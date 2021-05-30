@@ -61,7 +61,7 @@ namespace lnpz{
 	//
 	// Image and rasterization
 	//
-	namespace internal_detail{
+	namespace internal_detail {
 
 		struct TripletBool {
 			bool fst, snd, thrd;
@@ -152,25 +152,34 @@ namespace lnpz{
 			}
 		};
 
-		// TODO FIX THIS!
+		//------
+		// TODO make sures this works
+		//------
+
 		struct PolyFaceDistance{
 
+#if 0  // TODO instead of outer and inner wires at this stage have just wires
 			const std::vector<point2_t>& outerWire;
 			const std::vector<std::vector<point2_t>>& innerWires;
+#endif
+		
+			// Remember to add the last-to-start edge here
+			const std::vector<std::vector<point2_t>>& wires;
 
 			inline float unsignedDistance(const point2_t& p) const {
-				auto dist = unsignedDistance(p, outerWire);
-				for (const auto& inner : innerWires) {
-					auto idist = unsignedDistance(p, inner);
+				
+				auto dist = unsignedDistance(p, wires[0]);
+				for (size_t i = 1; i < wires.size(); i++) {
+					auto idist = unsignedDistance(p, wires[i]);
 					dist = std::min(dist, idist);
 				}
 				return dist;
 			}
 
 			inline float signedDistance(const point2_t& p) const {
-				auto dist = signedDistance(p, outerWire);
-				for (const auto& inner : innerWires) {
-					auto idist = signedDistance(p, inner);
+				auto dist = signedDistance(p, wires[0]);
+				for (size_t i = 1; i < wires.size(); i++) {
+					auto idist = signedDistance(p, wires[i]);
 					if (fabsf(idist) < fabsf(dist))
 						dist = idist;
 				}
@@ -333,7 +342,6 @@ namespace lnpz{
 			float f2;
 
 			// return false if totally transparent - has no effect
-			//bool unsignedDistanceToColor(float d, RGBAFloat32& out) {
 			bool lineColorFromDistance(float d, RGBAFloat32& out) {
 				d = fabsf(d);
 				// todo remove this and can colorize areas?
@@ -350,7 +358,6 @@ namespace lnpz{
 			}
 
 			// lerp anti-alias - fill areas - antialias f beyond and f inside the border
-			//bool signedDistanceToColor(float d, RGBAFloat32& out) {
 			bool fillColorFromDistance(float d, RGBAFloat32& out) {
 				if (d > f)
 					return false;
@@ -366,7 +373,8 @@ namespace lnpz{
 				return true;
 			}
 
-			static ColorizeMaterial2D Create(const material_t& linesMaterial, const material_t& polygonMaterial) {
+			static ColorizeMaterial2D Create(
+				const material_t& linesMaterial, const material_t& polygonMaterial) {
 				ColorizeMaterial2D c;
 				c.src.colorFill = polygonMaterial.color;
 				c.src.colorLine = linesMaterial.color;
@@ -471,8 +479,17 @@ namespace lnpz{
 
 		}
 
-		void RasterizePolygonFace(const matrix33_t sceneToPixel, const Scene::instance_t& inst, const polygonface_t& face, ImageRGBA32Linear& framebuffer) {
+		void RasterizePolygonFace(const matrix33_t sceneToPixel, 
+			const Scene::instance_t& inst, const renderablepolygonface_t& face, ImageRGBA32Linear& framebuffer) {
+			
+			// Almost same as for lines
+
+
+			// 
+
 			// get scenespace geometry
+
+
 			// convert to distance field in scenespace
 			// colorize distance field
 
@@ -483,11 +500,92 @@ namespace lnpz{
 				RasterizeLineString(sceneToPixel, inst, scene.m_lines[inst.idx], framebuffer);
 			}
 			else if (inst.type == InstanceType::PolygonFace) {
-				RasterizePolygonFace(sceneToPixel, inst, scene.m_polygonFaces[inst.idx], framebuffer);
+				RasterizePolygonFace(sceneToPixel, inst, scene.m_renderablePolygons[inst.idx], framebuffer);
 			}
 		}
+
+		//-------------------------------------------
+		// Geometry preprocessing
+		//-------------------------------------------
+
+
+		struct cleanedpolygon_t {
+
+			struct wire_t {
+				uint32_t fst;
+				uint32_t snd;
+
+				uint64_t as64() const {
+					uint64_t u = *((uint64_t*)this);
+					return u;
+				}
+
+				static wire_t From64(uint64_t u) {
+					wire_t w = *((wire_t*)(&u));
+					return w;
+				}
+			};
+
+			std::vector<wire_t> wires;
+			std::vector<point2_t> vertices;
+
+		};
+
+		bool ProcessPolyface(const polygonface_t& polyface, renderablepolygonface_t& res) {
+
+			//
+			// Trivial conversion for debugging purposes
+			//
+			res.wires.push_back(polyface.outerWire);
+			for(const auto& inw : polyface.innerWires)
+				res.wires.push_back(inw.reversed());
+
+			return true;
+		}
+
+	} // end internal_detail
+
+	//
+	// SimpleBuilder
+	//
+
+
+	void SimpleBuilder::setMaterial(const material_t& mat) {
+		m_currentMaterial = mat;
 	}
 
+	void SimpleBuilder::addLineString(const linestring_t& ls) {
+		m_scene.m_lines.push_back(ls);
+		auto idx = m_scene.m_lines.size() - 1;
+		localToWorldTransform_t trf;
+		m_scene.m_instances.push_back({ trf, m_currentMaterial, InstanceType::LineString, idx });
+	}
+
+	void SimpleBuilder::addPolygonFace(const polygonface_t& pf) {
+		renderablepolygonface_t renderable;
+
+		bool isValid = internal_detail::ProcessPolyface(pf, renderable);
+
+		if (!isValid)
+			return;
+
+		m_scene.m_polygonFaces.push_back(pf);
+
+		renderable.sourcePolygonIndex = m_scene.m_polygonFaces.size() - 1;
+		m_scene.m_renderablePolygons.push_back(renderable);
+		auto idx = m_scene.m_renderablePolygons.size() - 1;
+
+		localToWorldTransform_t trf;
+		m_scene.m_instances.push_back({ trf, m_currentMaterial, InstanceType::PolygonFace, idx });
+	}
+
+	Scene SimpleBuilder::build() const {
+		return m_scene;
+	}
+
+	//
+	// Renderer
+	//
 	typedef Array2D<RGBAFloat32> ImageRGBA32Linear;
 
 	void Renderer::draw(const Scene& scene) {

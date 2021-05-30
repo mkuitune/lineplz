@@ -62,15 +62,30 @@ namespace lnpz{
 			}
 			return r;
 		}
+
+		linestring_t reversed() const noexcept {
+			return { std::vector<point2_t>(points.rbegin(), points.rend()) };
+		}
 	};
 
 	struct polygonface_t {
+
+		/*  polygonface_t wires do not contain the last edge, it is implicit. 
+			This way polygonface is always closed by definition (and it's not up to the
+			input data to close it or not).
+		*/
+
 		linestring_t outerWire;
 		std::vector<linestring_t> innerWires;
 
 		rectangle_t boundingRectangle() const {
 			return outerWire.boundingRectangle();
 		}
+	};
+
+	struct renderablepolygonface_t {
+		size_t sourcePolygonIndex;
+		std::vector<linestring_t> wires;
 	};
 
 	struct localToWorldTransform_t {
@@ -100,7 +115,8 @@ namespace lnpz{
 		};
 
 		std::vector<linestring_t> m_lines;
-		std::vector<polygonface_t> m_polygonFaces;
+		std::vector<polygonface_t> m_polygonFaces; // original data for polygons, store for reference
+		std::vector<renderablepolygonface_t> m_renderablePolygons; // Geometry preprocessed for rendering
 		std::vector<instance_t> m_instances;
 
 		rectangle_t getInstanceLocalBounds(const instance_t& inst) const {
@@ -149,27 +165,12 @@ namespace lnpz{
 		material_t m_currentMaterial;
 
 	public:
-		void setMaterial(const material_t& mat) {
-			m_currentMaterial = mat;
-		}
+		
+		void setMaterial(const material_t& mat);
+		void addLineString(const linestring_t& ls);
+		void addPolygonFace(const polygonface_t& pf);
 
-		void addLineString(const linestring_t& ls) {
-			m_scene.m_lines.push_back(ls);
-			auto idx = m_scene.m_lines.size() - 1;
-			localToWorldTransform_t trf;
-			m_scene.m_instances.push_back({ trf, m_currentMaterial, InstanceType::LineString, idx });
-		}
-
-		void addPolygonFace(const polygonface_t& pf) {
-			m_scene.m_polygonFaces.push_back(pf);
-			auto idx = m_scene.m_polygonFaces.size() - 1;
-			localToWorldTransform_t trf;
-			m_scene.m_instances.push_back({ trf, m_currentMaterial, InstanceType::PolygonFace, idx });
-		}
-
-		Scene build() const {
-			return m_scene;
-		}
+		Scene build() const;
 	};
 
 	struct SceneConfig {

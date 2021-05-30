@@ -6,7 +6,7 @@ void drawSquare() {
 	SimpleBuilder builder;
 	material_t mat;
 	mat.color = RGBAFloat32::Black();
-	mat.lineWidth = 3.f;
+	mat.lineWidth = 15.f;
 	builder.setMaterial(mat);
 	builder.addLineString({ {{0,0},{1,0}, {1,1}, {0,1}, {0,0}} });
 	builder.addPolygonFace({ {{{0,0},{1,0}, {1,1}, {0,1}}},{} });
