@@ -839,6 +839,14 @@ namespace lnpz_linalg {
             return true;
         }
 
+        nslab expandSymmetric(T dist) const {
+            auto offset = pnt_t(dist);
+            nslab res;
+            res.minpoint = minpoint - offset;
+            res.MAXpoint = MAXpoint + offset;
+            return res;
+        }
+
         constexpr pnt_t diagonal() const noexcept {
             return MAXpoint - minpoint;
         }
