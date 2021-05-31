@@ -571,7 +571,6 @@ namespace lnpz{
 				auto frameBufferBounds = GetImageArrayBounds(framebuffer);
 
 				// Pixel bounds
-				// TODO Add linewidth !
 				auto linePixelBounds = linesInPixels.boundingRectangle();
 				linePixelBounds = linePixelBounds.expandSymmetric(inst.material.lineWidth * 1.05);
 
@@ -637,10 +636,7 @@ namespace lnpz{
 				auto frameBufferBounds = GetImageArrayBounds(framebuffer);
 
 				// Pixel bounds
-				// TODO Add linewidth !
 				auto linePixelBounds = faceInPixelSpace.boundingRectangle();
-
-				// TODO DO NOT USE ONLY FOR DEBUGGING
 				linePixelBounds = linePixelBounds.expandSymmetric(inst.material.lineWidth * 1.05);
 
 				rectangle_t rasterizationBounds;
