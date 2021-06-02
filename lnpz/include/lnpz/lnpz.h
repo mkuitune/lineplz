@@ -50,9 +50,11 @@ namespace lnpz{
 	typedef lnpz_linalg::double3x3          matrix33_t;
 	typedef lnpz_linalg::nslab<double, 2>   rectangle_t;
 
+	using namespace std;
+
 	// Single line is a linestring with two points
 	struct linestring_t {
-		std::vector<point2_t> points;
+		vector<point2_t> points;
 
 		rectangle_t boundingRectangle() const noexcept {
 			using namespace std;

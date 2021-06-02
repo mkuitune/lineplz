@@ -33,13 +33,15 @@
 #include <lnpz/lnpz.h>
 
 #include "lnpz_util.h"
-
 #include "lnpz_fieldquadtree.h"
+#include "lnpz_floatingpoint.h"
 
 #include <vector>
 #include <filesystem>
 #include <iostream>
 #include <fstream>
+#include <unordered_map>
+#include <algorithm>
 
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "stb/stb_image_resize.h"
@@ -52,6 +54,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
 #undef STB_IMAGE_IMPLEMENTATION
+
+using namespace std;
 
 //
 // Utilities
@@ -89,7 +93,7 @@ namespace lnpz{
 
 		struct LineStringDistance{
 
-			const std::vector<point2_t>& lines;
+			const vector<point2_t>& lines;
 
 			inline float unsignedDistance(const point2_t& p) const
 			{
@@ -104,7 +108,7 @@ namespace lnpz{
 					auto e = pj - pi;
 					auto w = p - pi;
 					auto b = w - e * clampd(dot(w,e) / dot(e,e), 0.0, 1.0);
-					d = std::min(d, dot(b,b));
+					d = min(d, dot(b,b));
 				}
 				return (float)sqrt(d);
 			}
@@ -124,7 +128,7 @@ namespace lnpz{
 					auto e = pj - pi;
 					auto w = p - pi;
 					auto b = w - e * clampd(dot(w,e) / dot(e,e), 0.0, 1.0);
-					d = std::min(d, dot(b,b));
+					d = min(d, dot(b,b));
 					TripletBool c = { p.y >= pi.y, p.y < pj.y, e.x* w.y > e.y * w.x };
 					if (c.all() || c.allNot())
 						s *= -1.0;
@@ -139,13 +143,13 @@ namespace lnpz{
 				return unsignedDistance({ x,y });
 			}
 
-			std::function<float(float, float)> bindSigned() const {
+			function<float(float, float)> bindSigned() const {
 				return[this](float a, float b) {
 					return this->signedDistance(a, b);
 				};
 			}
 
-			std::function<float(float, float)> bindUnsigned() const {
+			function<float(float, float)> bindUnsigned() const {
 				return[this](float a, float b) {
 					return this->unsignedDistance(a, b);
 				};
@@ -159,19 +163,19 @@ namespace lnpz{
 		struct PolyFaceDistance{
 
 #if 0  // TODO instead of outer and inner wires at this stage have just wires
-			const std::vector<point2_t>& outerWire;
-			const std::vector<std::vector<point2_t>>& innerWires;
+			const vector<point2_t>& outerWire;
+			const vector<vector<point2_t>>& innerWires;
 #endif
 		
 			// Remember to add the last-to-start edge here
-			//const std::vector<std::vector<point2_t>>& wires;
-			const std::vector<linestring_t>& wires;
+			//const vector<vector<point2_t>>& wires;
+			const vector<linestring_t>& wires;
 
 			// for computing signed distance over several wires
 			struct calculatesigned_t {
 				bool inside = false;
 
-				float distance(const point2_t& p, const std::vector<linestring_t>& wires) {
+				float distance(const point2_t& p, const vector<linestring_t>& wires) {
 
 					auto dist = distance(p, wires[0].points);
 					for (size_t i = 1; i < wires.size(); i++) {
@@ -182,10 +186,10 @@ namespace lnpz{
 					return dist;
 				}
 
-				inline float distance(const point2_t& p, const std::vector<point2_t>& lines)
+				inline float distance(const point2_t& p, const vector<point2_t>& lines)
 				{
 					size_t N = lines.size();
-					double d = std::numeric_limits<double>::max();
+					double d = numeric_limits<double>::max();
 					int rcross = 0;
 					for (size_t i = N - 1, j = 0; j < N; i = j, j++) {
 						auto pi = lines[i];
@@ -195,7 +199,7 @@ namespace lnpz{
 						auto b = w - e * clampd(dot(w, e) / dot(e, e), 0.0, 1.0);
 						auto bb = dot(b, b);
 						bool isleft = e.x * w.y > e.y * w.x; // is w cross e down (point outside) or up (point inside)
-						d = std::min(d, dot(b, b));
+						d = min(d, dot(b, b));
 
 						if (p.y < pi.y) {
 							if (pj.y <= p.y) {
@@ -217,14 +221,14 @@ namespace lnpz{
 					auto dist = unsignedDistance(p, wires[0].points);
 					for (size_t i = 1; i < wires.size(); i++) {
 						auto idist = unsignedDistance(p, wires[i].points);
-						dist = std::min(dist, idist);
+						dist = min(dist, idist);
 					}
 					return dist;
 				}
 
 				// Polygon face source data does NOT contain the last edge - that is implicit handled
 				// in rendering - and preprocessing needs to clean it so it's correct
-				inline float unsignedDistance(const point2_t& p, const std::vector<point2_t>& lines) const
+				inline float unsignedDistance(const point2_t& p, const vector<point2_t>& lines) const
 				{
 					size_t N = lines.size();
 					auto dist0 = p - lines[0];
@@ -236,7 +240,7 @@ namespace lnpz{
 						auto e = pj - pi;
 						auto w = p - pi;
 						auto b = w - e * clampd(dot(w, e) / dot(e, e), 0.0, 1.0);
-						d = std::min(d, dot(b, b));
+						d = min(d, dot(b, b));
 					}
 					return sqrtf(d);
 				}
@@ -265,12 +269,12 @@ namespace lnpz{
 
 				// Polygon face source data does NOT contain the last edge - that is implicit handled
 				// in rendering - and preprocessing needs to clean it so it's correct
-				inline float signedDistance(const point2_t& p, const std::vector<point2_t>& lines) const
+				inline float signedDistance(const point2_t& p, const vector<point2_t>& lines) const
 				{
 					size_t N = lines.size();
 					//auto dist0 = p - lines[0];
 					//double d = dot(dist0,dist0);
-					double d = std::numeric_limits<double>::max();
+					double d = numeric_limits<double>::max();
 					int rcross = 0;
 					// Compute the winding number while iterating over edges to find the shortest distance
 					bool inside = false;
@@ -282,7 +286,7 @@ namespace lnpz{
 						auto b = w - e * clampd(dot(w, e) / dot(e, e), 0.0, 1.0);
 						auto bb = dot(b, b);
 						bool isleft = e.x * w.y > e.y * w.x; // is w cross e down (point outside) or up (point inside)
-						d = std::min(d, dot(b, b));
+						d = min(d, dot(b, b));
 
 						// compute edge crossing with infinite ray along x from p
 							//U0 = pj
@@ -313,7 +317,7 @@ namespace lnpz{
 				}
 #endif
 				// apply sign only after returning
-				inline float signedDistanceForceWinding(const point2_t& p, const std::vector<point2_t>& lines, double& s) const
+				inline float signedDistanceForceWinding(const point2_t& p, const vector<point2_t>& lines, double& s) const
 				{
 					size_t N = lines.size();
 					auto dist0 = p - lines[0];
@@ -327,7 +331,7 @@ namespace lnpz{
 						auto e = pj - pi;
 						auto w = p - pi;
 						auto b = w - e * clampd(dot(w, e) / dot(e, e), 0.0, 1.0);
-						d = std::min(d, dot(b, b));
+						d = min(d, dot(b, b));
 						TripletBool c = { p.y >= pi.y, p.y < pj.y, e.x* w.y > e.y * w.x };
 
 						if (c.all() || c.allNot())
@@ -338,7 +342,7 @@ namespace lnpz{
 				}
 
 #if 0
-				inline float signedDistanceForceWinding(const point2_t& p, const std::vector<point2_t>& lines, double& s) const
+				inline float signedDistanceForceWinding(const point2_t& p, const vector<point2_t>& lines, double& s) const
 				{
 					size_t N = lines.size();
 					auto dist0 = p - lines[0];
@@ -352,7 +356,7 @@ namespace lnpz{
 						auto e = pj - pi;
 						auto w = p - pi;
 						auto b = w - e * clampd(dot(w, e) / dot(e, e), 0.0, 1.0);
-						d = std::min(d, dot(b, b));
+						d = min(d, dot(b, b));
 						TripletBool c = { p.y >= pi.y, p.y < pj.y, e.x* w.y > e.y * w.x };
 
 						if (c.all() || c.allNot())
@@ -370,13 +374,13 @@ namespace lnpz{
 					return unsignedDistance({ x,y });
 				}
 
-				std::function<float(float, float)> bindSigned() const {
+				function<float(float, float)> bindSigned() const {
 					return[this](float a, float b) {
 						return this->signedDistance(a, b);
 					};
 				}
 
-				std::function<float(float, float)> bindUnsigned() const {
+				function<float(float, float)> bindUnsigned() const {
 					return[this](float a, float b) {
 						return this->unsignedDistance(a, b);
 					};
@@ -385,9 +389,9 @@ namespace lnpz{
 
 			// Callback for stb_image_write
 			void WriteBytes(void* context, void* data, int size) {
-				std::vector<uint8_t>* bytes = (std::vector<uint8_t>*)(context);
+				vector<uint8_t>* bytes = (vector<uint8_t>*)(context);
 				uint8_t* byteData = (uint8_t*)data;
-				*bytes = std::vector<uint8_t>(byteData, byteData + size);
+				*bytes = vector<uint8_t>(byteData, byteData + size);
 			}
 
 			template<class T>
@@ -416,7 +420,7 @@ namespace lnpz{
 					}
 
 					static enumerator_t Create(size_t x0, size_t y0, size_t xmax, size_t ymax) {
-						size_t xinit = std::numeric_limits<size_t>::max();
+						size_t xinit = numeric_limits<size_t>::max();
 						return { x0, y0, xmax, ymax, xinit,0 };
 					}
 				};
@@ -426,8 +430,8 @@ namespace lnpz{
 				static bool Get(const rectangle_t& rect, PixelCover& res) {
 					double xmaxd = rect.max().x;
 					double ymaxd = rect.max().y;
-					double xmind = std::max(0.0, rect.min().x);
-					double ymind = std::max(0.0, rect.min().y);
+					double xmind = max(0.0, rect.min().x);
+					double ymind = max(0.0, rect.min().y);
 					size_t x0 = xmind;
 					size_t y0 = ymind;
 					size_t xmax = xmaxd;
@@ -556,7 +560,6 @@ namespace lnpz{
 				img.set(x, (height - y - 1), out);
 			}
 
-
 			void RasterizeLineString(const matrix33_t sceneToPixel, const Scene::instance_t& inst, const linestring_t& lines, ImageRGBA32Linear& framebuffer) {
 				using namespace lnpz_linalg;
 				// get scenespace geometry
@@ -616,7 +619,6 @@ namespace lnpz{
 					}
 					//}
 				}
-
 			}
 
 			void RasterizePolygonFace(const matrix33_t sceneToPixel,
@@ -725,29 +727,218 @@ namespace lnpz{
 			// Geometry preprocessing
 			//-------------------------------------------
 
+			struct edge_t {
+				uint32_t fst;
+				uint32_t snd;
 
-			struct cleanedpolygon_t {
+				uint64_t as64() const {
+					uint64_t u = *((uint64_t*)this);
+					return u;
+				}
 
-				struct wire_t {
-					uint32_t fst;
-					uint32_t snd;
+				static edge_t From64(uint64_t u) {
+					edge_t w = *((edge_t*)(&u));
+					return w;
+				}
+			};
 
-					uint64_t as64() const {
-						uint64_t u = *((uint64_t*)this);
-						return u;
+			struct indexedwire_t {
+				vector<uint32_t> indices;
+
+				vector<edge_t> getEdges() const {
+					vector<edge_t> res;
+					uint32_t sz = indices.size();
+					for (uint32_t i = 0; i < sz; i++) {
+						uint32_t j = (i + 1) % sz;
+						res.push_back({i, j});
 					}
+				}
+			};
 
-					static wire_t From64(uint64_t u) {
-						wire_t w = *((wire_t*)(&u));
-						return w;
-					}
-				};
+			struct indexedpolyface_t {
+				vector<indexedwire_t>  outerWires;
+				vector<indexedwire_t>  innerWires;
+				vector<point2_t> vertices;
+			};
+			
+			struct edgelist_t {
 
-				std::vector<wire_t> wires;
-				std::vector<point2_t> vertices;
+				unordered_map<uint32_t, vector<edge_t>> edgesAtVertex;
+			
+				vector<vector<edge_t>> outerWires;
+				vector<vector<edge_t>> innerWires;
+
+				vector<point2_t> vertices;
+
+				edgelist_t Create(indexedpolyface_t& pf ) {
+					edgelist_t  el;
+				}
 
 			};
 
+			void PolygonFaceToIndexed(
+				const polygonface_t& polyface,
+				indexedpolyface_t& result
+			) {
+
+				{
+					indexedwire_t indexedOuter;
+					for (const auto& owv : polyface.outerWire.points) {
+						result.vertices.push_back(owv);
+						indexedOuter.indices.push_back(result.vertices.size() - 1);
+					}
+					result.outerWires.push_back(indexedOuter);
+				}
+
+				for (const auto& innerWire : polyface.innerWires) {
+					indexedwire_t indexedInner;
+					for (const auto& iwv : innerWire.points) {
+						result.vertices.push_back(iwv);
+						indexedInner.indices.push_back(result.vertices.size() - 1);
+					}
+					result.innerWires.push_back(indexedInner);
+				}
+			}
+
+			struct clusteredvertices_t {
+
+				struct clustervertex_t {
+					point2_t pnt;
+					uint32_t sourceIndex; // index in source data - as we sort vertices this will change
+
+					bool withinRange(point2_t other, double floatDistance, int64_t ulpsDistance) {
+						return Float64::NearlyEqual(pnt.x, other.x, floatDistance, ulpsDistance) &&
+							Float64::NearlyEqual(pnt.y, other.y, floatDistance, ulpsDistance);
+					}
+
+					bool operator<(const clustervertex_t& r) const noexcept {
+						if (pnt.x < r.pnt.x) return true;
+						if (pnt.x > r.pnt.x) return false;
+						// x == r.x
+						if (pnt.y < r.pnt.y) return true;
+						// for cases pnt.y >= r.pnt.y
+						return false;
+					}
+				};
+
+				vector<clustervertex_t> clusteredInput;
+				vector<point2_t> resultVertices;
+				unordered_map<uint32_t, uint32_t> sourceToResult; // map from source index to eposition
+
+
+				void insert(point2_t pnt, uint32_t sourceIndex) {
+					clusteredInput.push_back({ pnt, sourceIndex });
+				}
+
+			private:
+
+				void sortVertices() {
+					sort(clusteredInput.begin(), clusteredInput.end());
+				}
+
+				void sortedToResult(double floatDistance, int64_t ulpsDistance) {
+					resultVertices.push_back(clusteredInput[0].pnt);
+					sourceToResult[clusteredInput[0].sourceIndex] = resultVertices.size() - 1;
+
+					for (uint32_t i = 1; i < clusteredInput.size(); i++) {
+						if (!clusteredInput[i].withinRange(resultVertices.back(), floatDistance, ulpsDistance)) {
+							resultVertices.push_back(clusteredInput[i].pnt);
+						}
+
+						sourceToResult[clusteredInput[i].sourceIndex] = resultVertices.size() - 1;
+					}
+				}
+
+			public:
+				void doClustering(double floatDistance, int64_t ulpsDistance) {
+					sortVertices();
+					sortedToResult(floatDistance, ulpsDistance);
+				}
+
+				//indexedpolyface_t getClustered() {
+				//}
+
+				indexedwire_t remapWire(const indexedwire_t& wireIn) {
+					indexedwire_t res;
+					for (auto v : wireIn.indices)
+						res.indices.push_back(sourceToResult[v]);
+
+					return res;
+				}
+			};
+
+			struct clusteredvertexbuilder_t {
+				clusteredvertices_t clustered;
+				std::string err;
+
+				indexedpolyface_t build(const indexedpolyface_t& indexed, double mergeRadius) {
+
+					for (size_t i = 0; i < indexed.vertices.size(); i++) {
+						clustered.insert(indexed.vertices[i], i);
+					}
+
+					double minMerge = 0.0000000001;
+					double usedRadius = max(minMerge, mergeRadius);
+					int64_t clusteringDistanceUlps = Float64::DoubleToNativeSignedUlps(usedRadius);
+					clustered.doClustering(minMerge, clusteringDistanceUlps);
+
+					// map source vertices to target vertices
+					indexedpolyface_t res;
+					res.vertices = clustered.resultVertices;
+
+					for (const auto& ow : indexed.outerWires)
+						res.outerWires.push_back(clustered.remapWire(ow));
+					for (const auto& iw : indexed.innerWires)
+						res.innerWires.push_back(clustered.remapWire(iw));
+
+					return res;
+				}
+			};
+
+			//indexedpolyface_t RemoveDegeneracies(const indexedpolyface_t& input) {
+			//}
+
+			string CleanIndexedPolyfaceToRenderable(const indexedpolyface_t& source, double mergeRadius, indexedpolyface_t& result) {
+				clusteredvertexbuilder_t builder;
+				indexedpolyface_t clustered = builder.build(source, mergeRadius);
+				if (!builder.err.empty())
+					return builder.err;
+
+				// a. Clean clustered data
+				// b. Remove degenerate loops
+				// c. compute intersection
+				// d. 
+
+
+				return "";
+			}
+
+			bool ProcessPolyface(const polygonface_t& polyface, renderablepolygonface_t& res) {
+
+				auto bounds = polyface.boundingRectangle();
+				auto maxsize = lnpz_linalg::largestElement(bounds.diagonal());
+				double mergeRadius = 0.0001 * maxsize;
+
+				indexedpolyface_t indexed;
+				PolygonFaceToIndexed(polyface, indexed);
+
+				indexedpolyface_t cleaned;
+				auto cleanres = CleanIndexedPolyfaceToRenderable(indexed, mergeRadius, cleaned);
+				if (!cleanres.empty())
+					return false;
+
+				//
+				// Trivial conversion for debugging purposes
+				//
+				res.wires.push_back(polyface.outerWire);
+				for (const auto& inw : polyface.innerWires) {
+					//res.wires.push_back(inw.reversed());
+					res.wires.push_back(inw);
+				}
+
+				return true;
+			}
+#if 0
 			bool ProcessPolyface(const polygonface_t& polyface, renderablepolygonface_t& res) {
 
 				//
@@ -762,6 +953,7 @@ namespace lnpz{
 
 				return true;
 			}
+#endif
 
 		} // end internal_detail
 
@@ -843,8 +1035,8 @@ namespace lnpz{
 			m_framebuffer = ConvertRBGA32LinearToSrgba(framebuffer);
 		}
 
-		std::string Renderer::write(const std::string& pathOut) const {
-			std::vector<uint8_t> byteArray;
+		string Renderer::write(const string& pathOut) const {
+			vector<uint8_t> byteArray;
 			int width = (int)m_framebuffer.dim1();
 			int height = (int)m_framebuffer.dim2();
 			int rowlength = 4 * width;
@@ -852,8 +1044,8 @@ namespace lnpz{
 			return util::WriteBytesToPath(byteArray, pathOut);
 		}
 
-		std::string Renderer::getSRGBABytes() const {
-			std::string res;
+		string Renderer::getSRGBABytes() const {
+			string res;
 			size_t size = m_framebuffer.sizeInBytes();
 			res.resize(size);
 			const char* src = (const char*)m_framebuffer.data();
