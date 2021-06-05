@@ -5,7 +5,7 @@
 // useful, an acknowledgement in your source text and/or product documentation
 // is appreciated, but not required.
 // 
-// The floating point routines are from the work of 
+// The floating point comparison routines are from the work of
 // Matt Kline (https://bitbashing.io/comparing-floats.html)
 // Bruce Dawson (https://randomascii.wordpress.com/)
 //

@@ -35,7 +35,6 @@
 
 #include "lnpz_util.h"
 #include "lnpz_fieldquadtree.h"
-#include "lnpz_floatingpoint.h"
 
 #include <vector>
 #include <filesystem>
@@ -922,22 +921,7 @@ namespace lnpz {
 			}
 		}
 
-		struct clusteringradius_t {
-			double minRadius;
-			int64_t ulpsRadius;
-
-			bool withinRange(const point2_t& a, const point2_t& b) {
-				return Float64::NearlyEqual(a.x, b.x, minRadius, ulpsRadius) &&
-					Float64::NearlyEqual(a.y, b.y, minRadius, ulpsRadius);
-			}
-
-			static clusteringradius_t Create(double mergeRadius) {
-				double minMerge = 0.0000000001;
-				double usedRadius = max(minMerge, mergeRadius);
-				int64_t clusteringDistanceUlps = Float64::DoubleToNativeSignedUlps(usedRadius);
-				return{ minMerge, clusteringDistanceUlps };
-			}
-		};
+		typedef lnpz_linalg::clusteringradius<double> clusteringradius_t;
 
 		struct clusteredvertices_t {
 
@@ -1067,6 +1051,10 @@ namespace lnpz {
 		};
 
 		vector<vector<edge_t>> ClipSelfIntersectionsAndFixOrienteation(const vector<edge_t>& input, bool outerWire, vector<point2_t>& vertices) {
+			// Algorithm:
+			// 1. clip edges.
+			// 2. remove edges that are inside polygon by wa
+
 			// TODO	
 			split_tree_t splitTree = split_tree_t::Init(input); // use split tree edges from now on
 
