@@ -4,11 +4,13 @@ project(lineplz-sample VERSION 1)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(sample 
+add_executable(
+	sample 
 	samples/lnpz-sample.cpp 
 	lnpz/lnpz_fieldquadtree.cpp
 	lnpz/lnpz_util.cpp
-	lnpz/lnpz.cpp)
+	lnpz/lnpz.cpp
+)
 
 target_include_directories(sample PUBLIC "lnpz/include/")
 set_target_properties(sample PROPERTIES CXX_EXTENSIONS OFF)
@@ -32,7 +34,13 @@ enable_testing()
 add_executable(
 	unittester
 	test/test.cpp
+	lnpz/lnpz_fieldquadtree.cpp
+	lnpz/lnpz_util.cpp
+	lnpz/lnpz.cpp
 )
+
+target_include_directories(unittester PUBLIC "lnpz/include/")
+
 target_link_libraries(
 	unittester	
 	gtest_main

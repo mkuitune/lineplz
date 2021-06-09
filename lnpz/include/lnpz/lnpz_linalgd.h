@@ -1123,120 +1123,212 @@ namespace lnpz_linalg {
         return { x,y,z};
     }
 
-    template<class T> class segment2{
-        vec<T, 2> fst;
-        vec<T, 2> snd;
-        vec<T, 2> D; // snd = fst + s * D
+	namespace segment_detail {
+        template<class T>
+		static constexpr T KrossEpsilon() { return (T)0.0001;/* Compared to sin(angle) - 0.005 degrees */ };
 
-        // Verify the points are not equal within the given epsilon before calling this
-        static segment2 Create(vec<T, 2> fst, vec<T, 2> snd) {
-            auto D = normalize(snd - fst);
-            return { fst, snd, D };
-        }
-
-        struct instersect_res_t {
-            // 0 - no intersect
-            // 1 - 1 intersect - pnt[0]
-            // 2 - 2 intersects - pnt[0], pnt[1]
-            int res;
-            vec<T, 2> pnt[2];
-
-            enum class MatchCode {None, First0, First1, Second0, Second1};
-            // Match code for pnt[0] and pnt[1]
-            MatchCode code[2];
-
-            instersect_res_t Init() {
-                instersect_res_t res;
-                res.res = 0;
-                res.code[0] = MatchCode::None; res.code[1] = MatchCode::None;
-            }
-        };
-
-        instersect_res_t intersect(const segment2& rh, clusteringradius<T> clus) const{
-            intersect_res_t res = intersect_res_t::Init();
-            return res;
-        }
-
-    };
-
-    template<class T, int M>
-    class nslab {
-    public:
-        typedef vec<T, M> pnt_t;
-    private:
-        pnt_t minpoint;
-        pnt_t MAXpoint;
-    public:
-
-        const pnt_t& min() const noexcept { return minpoint; }
-        const pnt_t& max() const noexcept{ return MAXpoint; }
-
-        bool valid() const noexcept {
-            return elementsLargerThanOrEqual(MAXpoint, minpoint);
-        }
-
-        void coverInPlace(const pnt_t& p) noexcept {
-            minpoint = smallestElements(minpoint, p);
-            MAXpoint = largestElements(MAXpoint, p);
-        }
-
-        void coverInPlace(const nslab& r) noexcept {
-            minpoint = smallestElements(minpoint, r.minpoint);
-            MAXpoint = largestElements(MAXpoint, r.MAXpoint);
-        }
-
-        // Return false if the intersection is nill
-        bool intersect(const nslab& rhs, nslab& result) const{
-            bool valid = elementsLargerOrEqual(MAXpoint, rhs.minpoint) && elementsLargerOrEqual(rhs.MAXpoint, minpoint);
-            if (!valid)
-                return false;
-            auto minp = largestElements(minpoint, rhs.minpoint);
-            auto maxp = smallestElements(MAXpoint, rhs.MAXpoint);
-            result.minpoint = minp;
-            result.MAXpoint = maxp;
-            return true;
-        }
-
-        nslab expandSymmetric(T dist) const {
-            auto offset = pnt_t(dist);
-            nslab res;
-            res.minpoint = minpoint - offset;
-            res.MAXpoint = MAXpoint + offset;
-            return res;
-        }
-
-        constexpr pnt_t diagonal() const noexcept {
-            return MAXpoint - minpoint;
-        }
-
-        constexpr nslab cover(const nslab& rect) const noexcept {
-            nslab res = *this;
-            res.coverInPlace(rect);
-            return res;
-        }
-
-        constexpr nslab cover(const pnt_t& p) const noexcept {
-            nslab res = *this;
-            res.coverInPlace(p);
-            return res;
-        }
-
-        static constexpr nslab InitializeEmpty() {
-            nslab r;
-            constexpr T numMin = std::numeric_limits<T>::min();
-            constexpr T numMax = std::numeric_limits<T>::max();
-            r.minpoint = pnt_t(numMax);
-            r.MAXpoint = pnt_t(numMin);
-            return r;
-        }
+        template<class T>
+        static constexpr T KrossEpsilon2() { return KrossEpsilon<T>() * KrossEpsilon<T>(); }
         
-        static constexpr nslab InitializeFromPair(const pnt_t& p0, const pnt_t& p1) {
-            nslab r = InitializeEmpty();
-            r.coverInPlace(p0);
-            r.coverInPlace(p1);
-            return r;
-        }
-    };
+        template<class T>
+		static int FindIntersection(T u0, T u1, T v0, T v1, T w[2]) {
+			if (u1 < v0 || u0 > v1)
+				return 0;
+
+			if (u1 > v0) {
+				if (u0 < v1) {
+					if (u0 < v0) w[0] = v0; else w[0] = u0;
+					if (u1 > v1) w[1] = v1; else w[1] = u1;
+					return 2;
+				}
+				else {
+					// u0 == v1
+					w[0] = u0;
+					return 1;
+				}
+			}
+			else {
+				// u1 == v0
+				w[0] = u1;
+				return 1;
+			}
+		}
+	}
+	template<class T> class segment2 {
+	public:
+		vec<T, 2> fst;
+		vec<T, 2> snd;
+		vec<T, 2> D; // snd = fst +  D// 
+
+		// Verify the points are not equal within the given epsilon before calling this
+		static segment2 Create(vec<T, 2> fst, vec<T, 2> snd) {
+			auto D = snd - fst;
+			return { fst, snd, D };
+		}
+
+		enum MatchVertex { None = 0, First = 1, Second = 2, Both = 3 };
+		MatchVertex tryMatch(const vec<T, 2>& p, const clusteringradius<T>& clus) const noexcept {
+			int res = None;
+			if (clus.withinRange(fst, p)) res |= 1;
+			if (clus.withinRange(snd, p)) res |= 2;
+			return res;
+		}
+
+		struct intersect_res_t {
+			// 0 - no intersect
+			// 1 - 1 intersect - pnt[0]
+			// 2 - 2 intersects - pnt[0], pnt[1]
+			int count;
+			vec<T, 2> pnt[2];
+
+			static intersect_res_t Init() {
+				intersect_res_t res;
+				res.count = 0;
+				return res;
+			}
+		};
+
+		// From Schneider: Geometric Tools for Computer Graphics
+		// Check if the result vertices are input edge ende points after reading the result
+		intersect_res_t intersect(const segment2& rh, clusteringradius<T> clus) const {
+
+			using namespace segment_detail;
+
+			intersect_res_t res = intersect_res_t::Init();
+
+			auto E = rh.fst - fst;
+			double kross = D.x * rh.D.y - D.y * rh.D.x;
+			double sqrKross = kross * kross;
+			double sqrlen0 = length2(D);
+			double sqrlen1 = length2(rh.D);
+            double sqrEpsilon = KrossEpsilon2<T>();
+			vec<T, 2> p0Cand;
+			if (sqrKross > sqrEpsilon * sqrlen0 * sqrlen1) {
+				// Lines are not parallel
+				auto s = (E.x * rh.D.y - E.y * rh.D.x) / kross;
+
+				if (s < 0 || s > 1) {
+					return res;
+				}
+
+				auto t = (E.x * D.y - E.y * D.x) / kross;
+				if (t < 0 || t > 1) {
+					// intersection of lines is not a point on segment rh.fst, rh.snd
+					return res;
+				}
+
+				// Intersection is a point on each segment
+				res.pnt[0] = fst + s * D;
+				res.count = 1;
+				return res;
+			}
+			// Lines are parallel
+			auto sqrLenE = length2(E);
+			kross = E.x * D.y - E.y * D.x;
+			sqrKross = kross * kross;
+			if (sqrKross > sqrEpsilon * sqrlen0 * sqrLenE) {
+				// lines of the segments are different
+                res.count = 0;
+				return res;
+			}
+
+			// Lines of the segments are the same. Need to test overlap of segments
+			auto s0 = dot(D, E) / sqrlen0;
+			auto s1 = s0 + dot(D, rh.D) / sqrlen0;
+			decltype(s1) w[2];
+
+			auto smin = min(s0, s1);
+			auto smax = max(s0, s1);
+
+			int imax = FindIntersection<T>(0.0 /* this start */, 1.0 /* this end */, smin /* rh.start */, smax /*rh.end */, w);
+			res.count = imax;
+			for (int i = 0; i < imax; i++) {
+				res.pnt[i] = fst + w[i] * D;
+			}
+
+			return res;
+		}
+
+	};
+
+	template<class T, int M>
+	class nslab {
+	public:
+		typedef vec<T, M> pnt_t;
+	private:
+		pnt_t minpoint;
+		pnt_t MAXpoint;
+	public:
+
+		const pnt_t& min() const noexcept { return minpoint; }
+		const pnt_t& max() const noexcept { return MAXpoint; }
+
+		bool valid() const noexcept {
+			return elementsLargerThanOrEqual(MAXpoint, minpoint);
+		}
+
+		void coverInPlace(const pnt_t& p) noexcept {
+			minpoint = smallestElements(minpoint, p);
+			MAXpoint = largestElements(MAXpoint, p);
+		}
+
+		void coverInPlace(const nslab& r) noexcept {
+			minpoint = smallestElements(minpoint, r.minpoint);
+			MAXpoint = largestElements(MAXpoint, r.MAXpoint);
+		}
+
+		// Return false if the intersection is nill
+		bool intersect(const nslab& rhs, nslab& result) const {
+			bool valid = elementsLargerOrEqual(MAXpoint, rhs.minpoint) && elementsLargerOrEqual(rhs.MAXpoint, minpoint);
+			if (!valid)
+				return false;
+			auto minp = largestElements(minpoint, rhs.minpoint);
+			auto maxp = smallestElements(MAXpoint, rhs.MAXpoint);
+			result.minpoint = minp;
+			result.MAXpoint = maxp;
+			return true;
+		}
+
+		nslab expandSymmetric(T dist) const {
+			auto offset = pnt_t(dist);
+			nslab res;
+			res.minpoint = minpoint - offset;
+			res.MAXpoint = MAXpoint + offset;
+			return res;
+		}
+
+		constexpr pnt_t diagonal() const noexcept {
+			return MAXpoint - minpoint;
+		}
+
+		constexpr nslab cover(const nslab& rect) const noexcept {
+			nslab res = *this;
+			res.coverInPlace(rect);
+			return res;
+		}
+
+		constexpr nslab cover(const pnt_t& p) const noexcept {
+			nslab res = *this;
+			res.coverInPlace(p);
+			return res;
+		}
+
+		static constexpr nslab InitializeEmpty() {
+			nslab r;
+			constexpr T numMin = std::numeric_limits<T>::min();
+			constexpr T numMax = std::numeric_limits<T>::max();
+			r.minpoint = pnt_t(numMax);
+			r.MAXpoint = pnt_t(numMin);
+			return r;
+		}
+
+		static constexpr nslab InitializeFromPair(const pnt_t& p0, const pnt_t& p1) {
+			nslab r = InitializeEmpty();
+			r.coverInPlace(p0);
+			r.coverInPlace(p1);
+			return r;
+		}
+	};
 }
 
 #endif
