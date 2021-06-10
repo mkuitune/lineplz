@@ -1024,10 +1024,15 @@ namespace lnpz {
 		// the edges are collected back from picking only those edges that don't have children
 
 		struct split_tree_t {
+
 			struct split_t {
 				static const uint32_t npos = 0;
 				edge_t parent;
 				uint32_t childFst, childSnd;
+				
+				lnpz_linalg::segment2<double> toSegment(vector<point2_t>& vertices) const noexcept{
+					return { vertices[parent.fst], vertices[parent.snd] };
+				}
 
 				void appendChilds(vector<split_t>& splits, edge_t fst, edge_t snd) {
 					splits.push_back({ fst,split_t::npos, split_t::npos });
@@ -1037,15 +1042,37 @@ namespace lnpz {
 				}
 			};
 
+			clusteringradius_t clustering;
+
 			vector<split_t> edges;
+			vector<point2_t>& vertices;
 
-			void intersectingPairs() {}
-
-			static split_tree_t Init(const vector<edge_t>& input) {
-				split_tree_t res;
-				for (const auto& e : input) {
-					res.edges.push_back({ e,split_t::npos, split_t::npos });
+			void initialIntersectingPairs() { // collect all pairs from input
+				// test each edge with each other edge
+				//for edges a,b,c,d 
+				//a ->b,c,d, b->c,d, c->d
+				size_t initialSize = edges.size();
+				for (size_t i = 0; i < initialSize - 1; i++) {
+					for (size_t j = i + 1; j < initialSize; j++) {
+						auto ei = edges[i].toSegment(vertices);
+						auto ej = edges[j].toSegment(vertices);
+						lnpz_linalg::segment2<double>::intersect_res_t isect = ei.intersect(ej, clustering);
+						
+					}
 				}
+			}
+
+			void doSelfIntersect() {
+				initialIntersectingPairs();
+
+			}
+
+			static split_tree_t Init(const vector<edge_t>& input, vector<point2_t>& vertices, clusteringradius_t clustering) {
+				vector<split_t> edges;
+				for (const auto& e : input) {
+					edges.push_back({ e,split_t::npos, split_t::npos });
+				}
+				split_tree_t res = {clustering, edges, vertices};
 				return res;
 			}
 		};
@@ -1056,7 +1083,7 @@ namespace lnpz {
 			// 2. remove edges that are inside polygon by wa
 
 			// TODO	
-			split_tree_t splitTree = split_tree_t::Init(input); // use split tree edges from now on
+			split_tree_t splitTree = split_tree_t::Init(input, vertices); // use split tree edges from now on
 
 
 			// lastly
