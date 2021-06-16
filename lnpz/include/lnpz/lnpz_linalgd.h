@@ -1181,16 +1181,38 @@ namespace lnpz_linalg {
 			int count;
 			vec<T, 2> pnt[2];
 
+#if 0 // TODO REMOVE CATEGORIZE FEATURE
+            struct categorize_res_t {
+                int fst = -1; /* fst vertex: -1 - not an intersection. i(0|1): is the intersection at the pnt[i] intersection */
+                int snd = -1;
+
+                bool hasNonExistingVertices() const {
+                    return (fst >= 0) || (snd >= 0);
+                }
+            };
+            
+            categorize_res_t categorize(const clusteringradius<T>& clus, const segment2& seg) const noexcept{
+                categorize_res_t res;
+
+                for (int i = 0; i < count; i++) {
+                    if(clus.withinRange(pnt[i], seg.fst)) res.fst = i;
+                    if(clus.withinRange(pnt[i], seg.snd)) res.snd = i;
+                }
+
+                return res;
+            }
+#endif
 			static intersect_res_t Init() {
 				intersect_res_t res;
 				res.count = 0;
 				return res;
 			}
+
 		};
 
 		// From Schneider: Geometric Tools for Computer Graphics
 		// Check if the result vertices are input edge ende points after reading the result
-		intersect_res_t intersect(const segment2& rh, clusteringradius<T> clus) const {
+		intersect_res_t intersect(const segment2& rh) const {
 
 			using namespace segment_detail;
 
