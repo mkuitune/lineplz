@@ -738,6 +738,21 @@ namespace lnpz {
 				return u;
 			}
 
+			bool isUndirectedSame(const edge_t& e) const {
+				return (fst == e.fst && snd == e.snd) || (fst == e.snd && snd == e.fst);
+			}
+
+			bool containedIn(vector<edge_t*>& edges, size_t& containedIdx) const {
+				for (size_t i = 0; i < edges.size(); i++) {
+					auto e = edges[i];
+					if (isUndirectedSame(*e)) {
+						containedIdx = i;
+						return true;
+					}
+				}
+				return false;
+			}
+
 			static edge_t From64(uint64_t u) {
 				edge_t w = *((edge_t*)(&u));
 				return w;
@@ -1101,6 +1116,7 @@ namespace lnpz {
 
 			vector<split_t> edges;
 			vector<point2_t>& vertices;
+			size_t originalVertexSize; // initial vertex buffer size. Any vertex at index larger than this is a cut vertex
 
 			vector<pair<point2_t, uint32_t>> cutVertices; // position, address in vertex array. Pos = 0 implies not set yet
 
@@ -1224,11 +1240,13 @@ namespace lnpz {
 			}
 
 			static split_tree_t Init(const vector<edge_t>& input, vector<point2_t>& vertices, clusteringradius_t clustering) {
+				size_t originalVertexSize = vertices.size();
 				vector<split_t> edges;
 				for (const auto& e : input) {
 					edges.push_back({ e,split_t::npos, split_t::npos });
 				}
-				split_tree_t res = { clustering, edges, vertices };
+				vector<pair<point2_t, uint32_t>> cutVertices;
+				split_tree_t res = { clustering, edges, vertices, originalVertexSize,  cutVertices};
 				return res;
 			}
 		};
@@ -1274,6 +1292,50 @@ namespace lnpz {
 				}
 
 			}
+
+			static void SortCounterClockwise(vector<orientable_edge_t>& orientable) {
+				sort(orientable.begin(), orientable.end(), orientable_edge_t::OrderCCW);
+			}
+
+			static void SortClockwise(vector<orientable_edge_t>& orientable) {
+				sort(orientable.begin(), orientable.end(), orientable_edge_t::OrderCCW);
+				reverse(orientable.begin(), orientable.end());
+			}
+
+			static vector<orientable_edge_t> GetOrientableEdges(uint32_t srcVertex, const vector<edge_t*>& edgesIn, const vector<point2_t>& vertices) noexcept {
+				const point2_t vertexCoord = vertices[srcVertex];
+				vector<orientable_edge_t> res;
+				const point2_t* vertBuf = vertices.data();
+				for (size_t i = 0; i < edgesIn.size(); i++) {
+					const auto& edge = *edgesIn[i];
+					point2_t vertOut;
+					// set src vertex as coordinate origin
+					if (srcVertex == edge.fst)
+						vertOut = vertBuf[edge.snd] - vertexCoord;
+					else // src == snd
+						vertOut = vertBuf[edge.fst] - vertexCoord;
+
+					res.push_back({ i, vertOut });
+				}
+			}
+
+			static vector<size_t> GetCounterClockwiseOrder(uint32_t srcVertex, const vector<edge_t*>& edgesIn, const vector<point2_t>& vertices) {
+				auto oriented = GetOrientableEdges(srcVertex, edgesIn, vertices);
+				SortCounterClockwise(oriented);
+				vector<size_t> res;
+				for (auto ord : oriented)
+					res.push_back(ord.srcIndex);
+				return res;
+			}
+			
+			static vector<size_t> GetClockwiseOrder(uint32_t srcVertex, const vector<edge_t*>& edgesIn, const vector<point2_t>& vertices) {
+				auto oriented = GetOrientableEdges(srcVertex, edgesIn, vertices);
+				SortClockwise(oriented);
+				vector<size_t> res;
+				for (auto ord : oriented)
+					res.push_back(ord.srcIndex);
+				return res;
+			}
 		};
 
 		// use this to clean self intersections in single outer and inner wires
@@ -1282,13 +1344,21 @@ namespace lnpz {
 			vector<bool> edgeVisited;
 			vector<bool> vertexVisited;
 			vector<vector<edge_t>> cleaned;
+			map<uint32_t, vector<edge_t*>> edgesAroundVertex;
+
+			void buildEdgeMap(const vector<edge_t>& edges) {
+				// don't allow same edge several times
+				for (const auto& e : edges) {
+					edgesAroundVertex[]
+				}
+			}
 
 			// collect each loop from vertex to vertex
 			// if in the set of collected loops any is inside one another,remove
 			// the loop that is inside the other
 			void doClean(const vector<edge_t>& edges, const vector<point2_t>& vertices, bool outer /*is the winding rule cw or ccw*/) {
 				edgeVisited = vector<bool>(edges.size(), false);
-				vertexVisited = vector<bool>(vertices->size(), false);
+				vertexVisited = vector<bool>(vertices.size(), false);
 
 			}
 
@@ -1345,14 +1415,7 @@ namespace lnpz {
 				}
 			}
 
-			static void SortCounterClockwise(vector<orientable_edge_t>& orientable) {
-				sort(orientable.begin(), orientable.end(), orientable_edge_t::OrderCCW);
-			}
 
-			static void SortClockwise(vector<orientable_edge_t>& orientable) {
-				sort(orientable.begin(), orientable.end(), orientable_edge_t::OrderCCW);
-				reverse(orientable.begin(), orientable.end());
-			}
 
 			void buildRelations(bool priorityOuter) {
 				uint32_t maxVert = 0;
