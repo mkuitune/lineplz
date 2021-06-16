@@ -725,10 +725,283 @@ namespace lnpz {
 			}
 		}
 
+
 		//-------------------------------------------
 		// Geometry preprocessing
 		//-------------------------------------------
 
+		// TODO MOST OF THIS IS NOT NEEDED REMOVE
+		// edge and oriented_edge are interesting but if no utility is found remove them
+		struct edge_t {
+			uint32_t fst;
+			uint32_t snd;
+
+			uint64_t as64() const {
+				uint64_t u = *((uint64_t*)this);
+				return u;
+			}
+
+			bool isUndirectedSame(const edge_t& e) const {
+				return (fst == e.fst && snd == e.snd) || (fst == e.snd && snd == e.fst);
+			}
+
+			static edge_t From64(uint64_t u) {
+				edge_t w = *((edge_t*)(&u));
+				return w;
+			}
+		};
+
+		struct indexedwire_t {
+			vector<uint32_t> indices;
+
+			vector<edge_t> toEdges() const {
+				vector<edge_t> edges;
+				uint32_t sz = indices.size();
+				for (uint32_t i = 0; i < sz; i++) {
+					uint32_t j = (i + 1) % sz;
+					edges.push_back({ i, j });
+				}
+				return edges;
+			}
+		};
+
+
+		struct indexedpolyface_t {
+			vector<indexedwire_t>  outerWires;
+			vector<indexedwire_t>  innerWires;
+			vector<point2_t> vertices;
+		};
+
+		void PolygonFaceToIndexed(
+			const polygonface_t& polyface,
+			indexedpolyface_t& result
+		) {
+
+			{
+				indexedwire_t indexedOuter;
+				for (const auto& owv : polyface.outerWire.points) {
+					result.vertices.push_back(owv);
+					indexedOuter.indices.push_back(result.vertices.size() - 1);
+				}
+				result.outerWires.push_back(indexedOuter);
+			}
+
+			for (const auto& innerWire : polyface.innerWires) {
+				indexedwire_t indexedInner;
+				for (const auto& iwv : innerWire.points) {
+					result.vertices.push_back(iwv);
+					indexedInner.indices.push_back(result.vertices.size() - 1);
+				}
+				result.innerWires.push_back(indexedInner);
+			}
+		}
+
+		typedef lnpz_linalg::clusteringradius<double> clusteringradius_t;
+
+		struct clusteredvertices_t {
+
+			struct clustervertex_t {
+				point2_t pnt;
+				uint32_t sourceIndex; // index in source data - as we sort vertices this will change
+
+				bool operator<(const clustervertex_t& r) const noexcept {
+					if (pnt.x < r.pnt.x) return true;
+					if (pnt.x > r.pnt.x) return false;
+					// x == r.x
+					if (pnt.y < r.pnt.y) return true;
+					// for cases pnt.y >= r.pnt.y
+					return false;
+				}
+			};
+
+			vector<clustervertex_t> clusteredInput;
+			vector<point2_t> resultVertices;
+			unordered_map<uint32_t, uint32_t> sourceToResult; // map from source index to eposition
+
+			void insert(point2_t pnt, uint32_t sourceIndex) {
+				clusteredInput.push_back({ pnt, sourceIndex });
+			}
+
+		private:
+
+			void sortVertices() {
+				sort(clusteredInput.begin(), clusteredInput.end());
+			}
+
+			void sortedToResult(clusteringradius_t radius) {
+				resultVertices.push_back(clusteredInput[0].pnt);
+				sourceToResult[clusteredInput[0].sourceIndex] = resultVertices.size() - 1;
+
+				for (uint32_t i = 1; i < clusteredInput.size(); i++) {
+					if (!radius.withinRange(clusteredInput[i].pnt, resultVertices.back())) {
+						resultVertices.push_back(clusteredInput[i].pnt);
+					}
+
+					sourceToResult[clusteredInput[i].sourceIndex] = resultVertices.size() - 1;
+				}
+			}
+
+		public:
+			void doClustering(clusteringradius_t radius) {
+				sortVertices();
+				sortedToResult(radius);
+			}
+
+			indexedwire_t remapWire(const indexedwire_t& wireIn) {
+				indexedwire_t res;
+				for (auto v : wireIn.indices)
+					res.indices.push_back(sourceToResult[v]);
+
+				return res;
+			}
+		};
+
+		struct clusteredvertexbuilder_t {
+			clusteredvertices_t clustered;
+			std::string err;
+
+			indexedpolyface_t build(const indexedpolyface_t& indexed, clusteringradius_t clusteringRadius) {
+				for (size_t i = 0; i < indexed.vertices.size(); i++) {
+					clustered.insert(indexed.vertices[i], i);
+				}
+
+				clustered.doClustering(clusteringRadius);
+
+				// map source vertices to target vertices
+				indexedpolyface_t res;
+				res.vertices = clustered.resultVertices;
+
+				for (const auto& ow : indexed.outerWires)
+					res.outerWires.push_back(clustered.remapWire(ow));
+				for (const auto& iw : indexed.innerWires)
+					res.innerWires.push_back(clustered.remapWire(iw));
+
+				return res;
+			}
+		};
+
+		size_t NumberOfUniqueVertices(const vector<edge_t>& input) {
+			unordered_set<uint32_t> usedVertices;
+			for (auto& e : input) {
+				usedVertices.insert(e.fst);
+				usedVertices.insert(e.snd);
+			}
+			return usedVertices.size();
+		}
+
+		struct edgefaces_t {
+			vector<vector<edge_t>> outerWires;
+			vector<vector<edge_t>> innerWires;
+
+			vector<point2_t> vertices;
+
+			static edgefaces_t Create(indexedpolyface_t& pf) {
+				edgefaces_t  ef;
+				ef.vertices = pf.vertices;
+				for (const auto& outerwire : pf.outerWires)
+					ef.outerWires.push_back(outerwire.toEdges());
+
+				for (const auto& innerwire : pf.innerWires)
+					ef.innerWires.push_back(innerwire.toEdges());
+
+				return ef;
+			}
+#if 0
+			struct edgeenumerator_t {
+				const edgefaces_t& edges;
+				uint32_t outerWireIdx = 0;
+				uint32_t edgeIdx = 0;
+				uint32_t innerWireIdx = 0;
+				edge_t edge;
+
+				bool next() {
+					if (outerWireIdx < edges.outerWires.size()) {
+						if (edgeIdx < edges.outerWires[outerWireIdx].size()) {
+							edge = edges.outerWires[outerWireIdx][edgeIdx];
+						}
+						else {
+							edgeIdx = 0;
+							outerWireIdx++;
+							if (outerWireIdx < edges.outerWires.size()) {
+								edge = edges.outerWires[outerWireIdx][edgeIdx];
+							}
+						}
+					}
+
+					if (outerWireIdx >= edges.outerWires.size() && innerWireIdx < edges.innerWires.size()) {
+						if (edgeIdx < edges.innerWires[innerWireIdx].size()) {
+							edge = edges.innerWires[innerWireIdx][edgeIdx];
+						}
+						else {
+							edgeIdx = 0;
+							innerWireIdx++;
+							if (innerWireIdx < edges.innerWires.size()) {
+								edge = edges.innerWires[innerWireIdx][edgeIdx];
+							}
+							else {
+								return false;
+							}
+						}
+					}
+					else {
+						return false;
+					}
+
+					edgeIdx++;
+				}
+			};
+
+			edgeenumerator_t getEdgeEnumerator() const {
+				return { *this,0,0,0,{0,0} };
+			}
+#endif
+		};
+
+		/* Remove 1 or 2 vertex shapes*/
+		edgefaces_t RemoveSimpleDegeneracies(const edgefaces_t& input, bool& resultNotDegenrate) {
+			edgefaces_t res;
+
+			vector<bool> vertexUsed(input.vertices.size(), false);
+
+			map<uint32_t, uint32_t> oldToNewVertex;
+			auto registerVertex = [&](uint32_t oldVertex) {
+				if (oldToNewVertex.count(oldVertex) == 0) {
+					res.vertices.push_back(input.vertices[oldVertex]);
+					oldToNewVertex[oldVertex] = res.vertices.size() - 1;
+				}
+				return oldToNewVertex[oldVertex];
+			};
+
+			resultNotDegenrate = false;
+
+			auto processWireset = [&](const vector<vector<edge_t>>& input, vector<vector<edge_t>>& output) {
+				for (const auto& iw : input) {
+					if (iw.size() < 3) {
+						continue;
+					}
+					size_t nUniqueVerts = NumberOfUniqueVertices(iw);
+					if (nUniqueVerts < 3) {
+						continue;
+					}
+					vector<edge_t> res;
+					for (const auto& inputEdge : iw) {
+						auto fst = registerVertex(inputEdge.fst);
+						auto snd = registerVertex(inputEdge.snd);
+						res.push_back({ fst, snd });
+					}
+
+					output.push_back(res);
+				}
+			};
+
+			processWireset(input.outerWires, res.outerWires);
+			processWireset(input.innerWires, res.innerWires);
+
+			resultNotDegenrate = res.outerWires.size() > 1;
+
+			return res;
+		}
+#if 0
 		struct edge_t {
 			uint32_t fst;
 			uint32_t snd;
@@ -835,250 +1108,6 @@ namespace lnpz {
 			vector<point2_t> vertices;
 		};
 
-		struct edgefaces_t {
-
-			//vector<vector<edge_t>> edgesAtVertex;
-			//unordered_set<uint64_t> edges;
-
-			vector<vector<edge_t>> outerWires;
-			vector<vector<edge_t>> innerWires;
-
-			vector<point2_t> vertices;
-
-			static edgefaces_t Create(indexedpolyface_t& pf) {
-				edgefaces_t  ef;
-				ef.vertices = pf.vertices;
-				for (const auto& outerwire : pf.outerWires)
-					ef.outerWires.push_back(outerwire.toEdges());
-
-				for (const auto& innerwire : pf.innerWires)
-					ef.innerWires.push_back(innerwire.toEdges());
-
-				//auto edgeEnum = ef.getEdgeEnumerator();
-				//while (edgeEnum.next()) {
-				//	ef.edges.insert(edgeEnum.edge.as64());
-				//}
-
-				return ef;
-			}
-
-			struct edgeenumerator_t {
-				const edgefaces_t& edges;
-				uint32_t outerWireIdx = 0;
-				uint32_t edgeIdx = 0;
-				uint32_t innerWireIdx = 0;
-				edge_t edge;
-
-				bool next() {
-					if (outerWireIdx < edges.outerWires.size()) {
-						if (edgeIdx < edges.outerWires[outerWireIdx].size()) {
-							edge = edges.outerWires[outerWireIdx][edgeIdx];
-						}
-						else {
-							edgeIdx = 0;
-							outerWireIdx++;
-							if (outerWireIdx < edges.outerWires.size()) {
-								edge = edges.outerWires[outerWireIdx][edgeIdx];
-							}
-						}
-					}
-
-					if (outerWireIdx >= edges.outerWires.size() && innerWireIdx < edges.innerWires.size()) {
-						if (edgeIdx < edges.innerWires[innerWireIdx].size()) {
-							edge = edges.innerWires[innerWireIdx][edgeIdx];
-						}
-						else {
-							edgeIdx = 0;
-							innerWireIdx++;
-							if (innerWireIdx < edges.innerWires.size()) {
-								edge = edges.innerWires[innerWireIdx][edgeIdx];
-							}
-							else {
-								return false;
-							}
-						}
-					}
-					else {
-						return false;
-					}
-
-					edgeIdx++;
-				}
-			};
-
-			edgeenumerator_t getEdgeEnumerator() const {
-				return { *this,0,0,0,{0,0} };
-			}
-		};
-
-		size_t NumberOfUniqueVertices(const vector<edge_t>& input) {
-			unordered_set<uint32_t> usedVertices;
-			for (auto& e : input) {
-				usedVertices.insert(e.fst);
-				usedVertices.insert(e.snd);
-			}
-			return usedVertices.size();
-		}
-
-		/* Remove 1 or 2 vertex shapes*/
-		/* Self intersections and so are handled separately */
-		// TODO Figure out if later processing implicitly deals with these issues
-		edgefaces_t RemoveSimpleDegeneracies(const edgefaces_t& input, bool& resultNotDegenrate) {
-			edgefaces_t res;
-
-			vector<bool> vertexUsed(input.vertices.size(), false);
-
-			map<uint32_t, uint32_t> oldToNewVertex;
-			auto registerVertex = [&](uint32_t oldVertex) {
-				if (oldToNewVertex.count(oldVertex) == 0) {
-					res.vertices.push_back(input.vertices[oldVertex]);
-					oldToNewVertex[oldVertex] = res.vertices.size() - 1;
-				}
-				return oldToNewVertex[oldVertex];
-			};
-
-			resultNotDegenrate = false;
-
-			auto processWireset = [&](const vector<vector<edge_t>>& input, vector<vector<edge_t>>& output) {
-				for (const auto& iw : input) {
-					if (iw.size() < 3) {
-						continue;
-					}
-					size_t nUniqueVerts = NumberOfUniqueVertices(iw);
-					if (nUniqueVerts < 3) {
-						continue;
-					}
-					vector<edge_t> res;
-					for (const auto& inputEdge : iw) {
-						auto fst = registerVertex(inputEdge.fst);
-						auto snd = registerVertex(inputEdge.snd);
-						res.push_back({ fst, snd });
-					}
-
-					output.push_back(res);
-				}
-			};
-
-			processWireset(input.outerWires, res.outerWires);
-			processWireset(input.innerWires, res.innerWires);
-
-			resultNotDegenrate = res.outerWires.size() > 1;
-
-			return res;
-		}
-
-		void PolygonFaceToIndexed(
-			const polygonface_t& polyface,
-			indexedpolyface_t& result
-		) {
-
-			{
-				indexedwire_t indexedOuter;
-				for (const auto& owv : polyface.outerWire.points) {
-					result.vertices.push_back(owv);
-					indexedOuter.indices.push_back(result.vertices.size() - 1);
-				}
-				result.outerWires.push_back(indexedOuter);
-			}
-
-			for (const auto& innerWire : polyface.innerWires) {
-				indexedwire_t indexedInner;
-				for (const auto& iwv : innerWire.points) {
-					result.vertices.push_back(iwv);
-					indexedInner.indices.push_back(result.vertices.size() - 1);
-				}
-				result.innerWires.push_back(indexedInner);
-			}
-		}
-
-		typedef lnpz_linalg::clusteringradius<double> clusteringradius_t;
-
-		struct clusteredvertices_t {
-
-			struct clustervertex_t {
-				point2_t pnt;
-				uint32_t sourceIndex; // index in source data - as we sort vertices this will change
-
-				bool operator<(const clustervertex_t& r) const noexcept {
-					if (pnt.x < r.pnt.x) return true;
-					if (pnt.x > r.pnt.x) return false;
-					// x == r.x
-					if (pnt.y < r.pnt.y) return true;
-					// for cases pnt.y >= r.pnt.y
-					return false;
-				}
-			};
-
-			vector<clustervertex_t> clusteredInput;
-			vector<point2_t> resultVertices;
-			unordered_map<uint32_t, uint32_t> sourceToResult; // map from source index to eposition
-
-
-			void insert(point2_t pnt, uint32_t sourceIndex) {
-				clusteredInput.push_back({ pnt, sourceIndex });
-			}
-
-		private:
-
-			void sortVertices() {
-				sort(clusteredInput.begin(), clusteredInput.end());
-			}
-
-			void sortedToResult(clusteringradius_t radius) {
-				resultVertices.push_back(clusteredInput[0].pnt);
-				sourceToResult[clusteredInput[0].sourceIndex] = resultVertices.size() - 1;
-
-				for (uint32_t i = 1; i < clusteredInput.size(); i++) {
-					if (!radius.withinRange(clusteredInput[i].pnt, resultVertices.back())) {
-						resultVertices.push_back(clusteredInput[i].pnt);
-					}
-
-					sourceToResult[clusteredInput[i].sourceIndex] = resultVertices.size() - 1;
-				}
-			}
-
-		public:
-			void doClustering(clusteringradius_t radius) {
-				sortVertices();
-				sortedToResult(radius);
-			}
-
-			//indexedpolyface_t getClustered() {
-			//}
-
-			indexedwire_t remapWire(const indexedwire_t& wireIn) {
-				indexedwire_t res;
-				for (auto v : wireIn.indices)
-					res.indices.push_back(sourceToResult[v]);
-
-				return res;
-			}
-		};
-
-		struct clusteredvertexbuilder_t {
-			clusteredvertices_t clustered;
-			std::string err;
-
-			indexedpolyface_t build(const indexedpolyface_t& indexed, clusteringradius_t clusteringRadius) {
-
-				for (size_t i = 0; i < indexed.vertices.size(); i++) {
-					clustered.insert(indexed.vertices[i], i);
-				}
-
-				clustered.doClustering(clusteringRadius);
-
-				// map source vertices to target vertices
-				indexedpolyface_t res;
-				res.vertices = clustered.resultVertices;
-
-				for (const auto& ow : indexed.outerWires)
-					res.outerWires.push_back(clustered.remapWire(ow));
-				for (const auto& iw : indexed.innerWires)
-					res.innerWires.push_back(clustered.remapWire(iw));
-
-				return res;
-			}
-		};
 
 		//indexedpolyface_t RemoveDegeneracies(const indexedpolyface_t& input) {
 		//}
@@ -1338,31 +1367,6 @@ namespace lnpz {
 			}
 		};
 
-		// use this to clean self intersections in single outer and inner wires
-		// after vertex clustering and edge clipping
-		struct clean_self_intersections_t {
-			vector<bool> edgeVisited;
-			vector<bool> vertexVisited;
-			vector<vector<edge_t>> cleaned;
-			map<uint32_t, vector<edge_t*>> edgesAroundVertex;
-
-			void buildEdgeMap(const vector<edge_t>& edges) {
-				// don't allow same edge several times
-				for (const auto& e : edges) {
-					edgesAroundVertex[]
-				}
-			}
-
-			// collect each loop from vertex to vertex
-			// if in the set of collected loops any is inside one another,remove
-			// the loop that is inside the other
-			void doClean(const vector<edge_t>& edges, const vector<point2_t>& vertices, bool outer /*is the winding rule cw or ccw*/) {
-				edgeVisited = vector<bool>(edges.size(), false);
-				vertexVisited = vector<bool>(vertices.size(), false);
-
-			}
-
-		};
 
 		struct vertex_edge_map_t {
 
@@ -1374,7 +1378,6 @@ namespace lnpz {
 				-- ei --> [vert] -- ej -->
 
 			*/
-
 			vector<vector<typed_edge_t*>> edgesFromVertex;
 
 			vector<bool> vertexVisited;
@@ -1415,8 +1418,6 @@ namespace lnpz {
 				}
 			}
 
-
-
 			void buildRelations(bool priorityOuter) {
 				uint32_t maxVert = 0;
 
@@ -1453,7 +1454,7 @@ namespace lnpz {
 
 					vector<orientable_edge_t> orientable = getOrientableEdges(i, vertices->at(i), edgesAroundVertex);
 					if (orderCCW)
-						SortCounterClockwise(orientable);
+						oriegnSortCounterClockwise(orientable);
 					else
 						SortClockwise(orientable);
 					
@@ -1628,10 +1629,6 @@ namespace lnpz {
 		// Use only for single wires
 		// while the algorithm adds vertices, this stage does not yet remove them (as cuts before boolean only add vertices, never remove them)
 		vector<vector<edge_t>> ClipSelfIntersectionsAndFixOrientation(const vector<edge_t>& input, bool outerWire, vector<point2_t>& vertices, clusteringradius_t clustering) {
-			// Algorithm:
-			// 1. clip edges.
-			// 2. remove edges that are inside polygon by wa
-			// 3. verify / fix winding to match that of outer or innerwire
 
 			// Clean self intersections
 			split_tree_t splitTree = split_tree_t::Init(input, vertices, clustering); // use split tree edges from now on
@@ -1639,34 +1636,9 @@ namespace lnpz {
 
 			vector<edge_t> selfEdges;
 			splitTree.collectAllLeafs(selfEdges);
+			return {selfEdges};
 
-			vertex_edge_map_t vem;
-			vem.addEdges(selfEdges, outerWire);
-			vem.setVertices(&vertices);
-			vem.buildRelations(outerWire);
-			vem.collectOuterEdges();
-			auto fixedWires = vem.outers;
-
-			// lastly
-			// go through results, see their winding, and reverse them if the winding number is wrong
-
-			vector<vector<edge_t>> res;
-			return res;
 		}
-
-		struct facemerge_t {
-			// TODO
-			// data such that
-			// per vertex can have only one outgoing edge, e.g 
-			// procedge{edge, bool outer?inner, bool used}
-			// set<uint64_t procedge>;
-
-			//TODO cleanup situations where outer wires are combined using single edge -> merge them
-			// normal edge pickup up builder will omit those
-			// 1. start pickup only from edge vertices (does not have symmetric pair)
-			// 2. omit symmetric pairs from output (they will be left over, don't consider this as a bug
-
-		};
 
 		string CleanIndexedPolyfaceToRenderable(const indexedpolyface_t& source, double mergeRadius, indexedpolyface_t& result) {
 
@@ -1694,6 +1666,30 @@ namespace lnpz {
 
 			return "";
 		}
+#endif
+		string CleanIndexedPolyfaceToRenderable(const indexedpolyface_t& source, double mergeRadius, indexedpolyface_t& result) {
+
+			// cluster vertices explicitly here before assigning to clipper lib
+			// TODO ADD HERE CLIPPER LIB
+
+			clusteringradius_t clusteringRadius = clusteringradius_t::Create(mergeRadius);
+			clusteredvertexbuilder_t builder;
+			indexedpolyface_t clustered = builder.build(source, clusteringRadius);
+			if (!builder.err.empty())
+				return builder.err;
+
+			edgefaces_t  initialEdges = edgefaces_t::Create(clustered);
+
+			bool cleanedNonDegenerate;
+			edgefaces_t cleaned = RemoveSimpleDegeneracies(initialEdges, cleanedNonDegenerate);
+			if (!cleanedNonDegenerate)
+				return "Input was degenerate";
+
+			// cleaned to clipper lib
+
+
+			return "";
+		}
 
 		bool ProcessPolyface(const polygonface_t& polyface, renderablepolygonface_t& res) {
 
@@ -1709,9 +1705,14 @@ namespace lnpz {
 			if (!cleanres.empty())
 				return false;
 
-			//
+			//-------------------------------------------
+			// TODO: convert cleaned to renderable
+			//-------------------------------------------
+
+			//------------------------------------------------
 			// Trivial conversion for debugging purposes
-			//
+			//------------------------------------------------
+			// COMMENT OUT V
 			res.wires.push_back(polyface.outerWire);
 			for (const auto& inw : polyface.innerWires) {
 				//res.wires.push_back(inw.reversed());
