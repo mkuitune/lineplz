@@ -781,7 +781,7 @@ template<class T> bool lnpz_linalg::elementsLargerOrEqual(const vec<T, 2>& a, co
 }
 
 template<class T> bool lnpz_linalg::elementsLargerOrEqual(const vec<T, 3>& a, const vec<T, 3>& b) {
-    return (a.x >= y.x) && (a.y >= y.y) && (a.z >= y.z);
+    return (a.x >= b.x) && (a.y >= b.y) && (a.z >= ybz);
 }
 
 //

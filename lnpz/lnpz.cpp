@@ -1670,6 +1670,9 @@ namespace lnpz {
 
 		string CleanIndexedPolyfaceToRenderable(const indexedpolyface_t& source, double mergeRadius, indexedpolyface_t& result) {
 
+
+			// TODO ADD HERE CLIPPER LIB
+
 			clusteringradius_t clusteringRadius = clusteringradius_t::Create(mergeRadius);
 			clusteredvertexbuilder_t builder;
 			indexedpolyface_t clustered = builder.build(source, clusteringRadius);
