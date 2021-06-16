@@ -997,7 +997,7 @@ namespace lnpz {
 			processWireset(input.outerWires, res.outerWires);
 			processWireset(input.innerWires, res.innerWires);
 
-			resultNotDegenrate = res.outerWires.size() > 1;
+			resultNotDegenrate = res.outerWires.size() > 0;
 
 			return res;
 		}
