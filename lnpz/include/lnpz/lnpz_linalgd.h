@@ -1352,17 +1352,6 @@ namespace lnpz_linalg {
 		}
 	};
 
-    inline double KahanSumd(double* inputStart, double* inputEnd) {
-        double sum = 0.0;                    // Prepare the accumulator.
-        double c = 0.0;                      // A running compensation for lost low-order bits.
-        for (auto& i = inputStart; i != inputEnd; i++) {
-            double y = *i - c;    // c is zero the first time around.
-            double t = sum + y;   // Alas, sum is big, y small, so low-order digits of y are lost.
-            c = (t - sum) - y;   // (t - sum) cancels the high-order part of y; subtracting y recovers negative (low part of y)
-            sum = t;             // Algebraically, c should always be zero. Beware overly-aggressive optimizing compilers!
-        }
-        return sum;
-    }
 
     // Accumulator for Kahan summation formula
     struct kahan_accumulator_t {
@@ -1378,6 +1367,14 @@ namespace lnpz_linalg {
 
         double result() const { return sum; }
     };
+    
+    inline double kahan_sumd(double* inputStart, double* inputEnd) {
+        kahan_accumulator_t acc;
+        for (auto& i = inputStart; i != inputEnd; i++) {
+            acc.add(*i);
+        }
+        return acc.result();
+    }
 
     // expect a polygon with points in xy. Input elements are such that *T is a vec<,2> or vec<,2>&
     template<class T> double signed_area2(const T& points, size_t count) {
