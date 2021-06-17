@@ -43,6 +43,21 @@ TEST(MathTest, Span2DOperations) {
 
 }
 
+TEST(MathTest, FloatingPoint) {
+	using namespace lnpz_linalg;
+#if 0
+	double zero = 0.0;
+	double a = 0.0001;
+	int64_t ulpsa = Float64::UlpsDistance(zero, a);
+	double m = 0.2;
+	double n = 0.5;
+	int64_t ulpsb = Float64::UlpsDistance(m,n);
+	
+	EXPECT_GT(ulpsb, ulpsa);
+#endif
+
+}
+
 TEST(MathTest, Polygon2Ds) {
 	using namespace lnpz_linalg;
 

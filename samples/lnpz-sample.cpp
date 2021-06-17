@@ -8,7 +8,7 @@ void drawSquare() {
 	mat.lineColor = RGBAFloat32::Black();
 	mat.faceColor = RGBAFloat32::Red();
 	//mat.lineWidth = 15.f;
-	mat.lineWidth = 10.f;
+	mat.lineWidth = 5.f;
 	builder.setMaterial(mat);
 
 	//builder.addLineString({ {{0,0},{1,0}, {1,1}, {0,1}, {0,0}} });

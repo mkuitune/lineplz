@@ -10,6 +10,7 @@ add_executable(
 	lnpz/lnpz_fieldquadtree.cpp
 	lnpz/lnpz_util.cpp
 	lnpz/lnpz.cpp
+	lnpz/clipper.cpp
 )
 
 target_include_directories(sample PUBLIC "lnpz/include/")
@@ -37,6 +38,7 @@ add_executable(
 	lnpz/lnpz_fieldquadtree.cpp
 	lnpz/lnpz_util.cpp
 	lnpz/lnpz.cpp
+	lnpz/clipper.cpp
 )
 
 target_include_directories(unittester PUBLIC "lnpz/include/")
