@@ -1382,7 +1382,7 @@ namespace lnpz_linalg {
             return false;
 
         kahan_accumulator_t area;
-        for (size_t i = 0; i < count - 1; i++) {
+        for (size_t i = 0; i < count; i++) {
             auto pi = points[i];
             auto pj = points[(i + 1) % count];
             area.add((double)(pi.x * pj.y - pj.x * pi.y));
