@@ -42,3 +42,27 @@ TEST(MathTest, Span2DOperations) {
 	EXPECT_EQ(resabef.count, 1);
 
 }
+
+TEST(MathTest, Polygon2Ds) {
+	using namespace lnpz_linalg;
+
+	typedef vec<double, 2> p2_t;
+	typedef std::vector<p2_t> polygon_t;
+
+	polygon_t clockwise = { {0,0},{0.5, 1.0},{1.0, 0.0} };
+	polygon_t counterclockwise = { {0,0},{1.0, 0.0},{0.5, 1.0} };
+
+	auto area_clockwise = signed_area2(clockwise, clockwise.size());
+	auto area_counterclockwise = signed_area2(counterclockwise, counterclockwise.size());
+	
+	EXPECT_EQ(area_clockwise, -0.5);
+	EXPECT_EQ(area_counterclockwise, 0.5);
+	
+	auto clockwise_res = is_polygon_counterclockwise(clockwise, clockwise.size());
+	auto counterclockwise_res = is_polygon_counterclockwise(counterclockwise, counterclockwise.size());
+
+	EXPECT_EQ(clockwise_res , false);
+	EXPECT_EQ(counterclockwise_res , true);
+
+
+}

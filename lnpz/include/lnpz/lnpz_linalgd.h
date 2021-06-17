@@ -1351,6 +1351,51 @@ namespace lnpz_linalg {
 			return r;
 		}
 	};
+
+    inline double KahanSumd(double* inputStart, double* inputEnd) {
+        double sum = 0.0;                    // Prepare the accumulator.
+        double c = 0.0;                      // A running compensation for lost low-order bits.
+        for (auto& i = inputStart; i != inputEnd; i++) {
+            double y = *i - c;    // c is zero the first time around.
+            double t = sum + y;   // Alas, sum is big, y small, so low-order digits of y are lost.
+            c = (t - sum) - y;   // (t - sum) cancels the high-order part of y; subtracting y recovers negative (low part of y)
+            sum = t;             // Algebraically, c should always be zero. Beware overly-aggressive optimizing compilers!
+        }
+        return sum;
+    }
+
+    // Accumulator for Kahan summation formula
+    struct kahan_accumulator_t {
+        double c = 0.0;
+        double sum = 0.0;
+
+        void add(double d) {
+            double y = d - c;    // c is zero the first time around.
+            double t = sum + y;   // Alas, sum is big, y small, so low-order digits of y are lost.
+            c = (t - sum) - y;   // (t - sum) cancels the high-order part of y; subtracting y recovers negative (low part of y)
+            sum = t;             // Algebraically, c should always be zero. Beware overly-aggressive optimizing compilers!
+        }
+
+        double result() const { return sum; }
+    };
+
+    // expect a polygon with points in xy. Input elements are such that *T is a vec<,2> or vec<,2>&
+    template<class T> double signed_area2(const T& points, size_t count) {
+        if (count < 3)
+            return false;
+
+        kahan_accumulator_t area;
+        for (size_t i = 0; i < count - 1; i++) {
+            auto pi = points[i];
+            auto pj = points[(i + 1) % count];
+            area.add((double)(pi.x * pj.y - pj.x * pi.y));
+        }
+        return 0.5 * area.result();
+    }
+
+    template<class T> bool is_polygon_counterclockwise(const T& points, size_t count) {
+        return signed_area2(points, count) > 0.0;
+    }
 }
 
 #endif
