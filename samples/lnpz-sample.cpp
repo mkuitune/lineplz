@@ -8,13 +8,19 @@ void drawSquare() {
 	mat.lineColor = RGBAFloat32::Black();
 	mat.faceColor = RGBAFloat32::Red();
 	//mat.lineWidth = 15.f;
-	mat.lineWidth = 5.f;
+	//mat.lineWidth = 5.f;
+	//mat.lineWidth = 2.f;
+	mat.lineWidth = 1.5f;
 	builder.setMaterial(mat);
 
 	//builder.addLineString({ {{0,0},{1,0}, {1,1}, {0,1}, {0,0}} });
 	//std::vector<linestring_t> inner = { {{{0.5,0.4},{0.4,0.4},{0.45,0.6}}} };
 
 	std::vector<linestring_t> inner = { {{{0.8,0.2},{0.2,0.2},{0.5,0.8}}} };
+
+	//std::vector<linestring_t> inner = { {{{1.2,0.2},{-0.2,0.2},{-0.2,0.8}, {1.2,0.8}}} };
+
+	//std::vector<linestring_t> inner = { {{{1.2,0.2},{0.2,0.2},{0.5,0.8}}} };
 	//std::vector<linestring_t> inner;
 
 	linestring_t outer = { {{0,0},{1,0}, {1,1}, {0,1}} };
