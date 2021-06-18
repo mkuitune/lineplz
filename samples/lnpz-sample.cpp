@@ -34,7 +34,7 @@ void drawSquare() {
 	sceneConfig.background = RGBAFloat32::White();
 	sceneConfig.outputHeightPixels = 256;
 	sceneConfig.paddingInPixels = 50;
-	Renderer renderer(sceneConfig);
+	Renderer2S renderer(sceneConfig);
 	renderer.draw(scene);
 	renderer.write("square.png");
 

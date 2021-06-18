@@ -1217,7 +1217,7 @@ namespace lnpz {
 		//
 		typedef Array2D<RGBAFloat32> ImageRGBA32Linear;
 
-		void Renderer::draw(const Scene& scene) {
+		void Renderer2S::draw(const Scene& scene) {
 
 			// Figure out framebuffer size and scene to framebuffer transform
 			const auto wb = scene.getWorldBounds();
@@ -1252,7 +1252,7 @@ namespace lnpz {
 			m_framebuffer = ConvertRBGA32LinearToSrgba(framebuffer);
 		}
 
-		string Renderer::write(const string& pathOut) const {
+		string Renderer2S::write(const string& pathOut) const {
 			vector<uint8_t> byteArray;
 			int width = (int)m_framebuffer.dim1();
 			int height = (int)m_framebuffer.dim2();
@@ -1261,7 +1261,7 @@ namespace lnpz {
 			return util::WriteBytesToPath(byteArray, pathOut);
 		}
 
-		string Renderer::getSRGBABytes() const {
+		string Renderer2S::getSRGBABytes() const {
 			string res;
 			size_t size = m_framebuffer.sizeInBytes();
 			res.resize(size);

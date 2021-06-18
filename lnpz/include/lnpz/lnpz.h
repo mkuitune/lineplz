@@ -190,13 +190,15 @@ namespace lnpz{
 		uint32_t paddingInPixels = 10; // padding around scene - is not added to output size but scene is contracted
 	};
 
-	class Renderer {
+
+	// Renderer2S - 2D software renderer
+	class Renderer2S {
 		SceneConfig m_sceneConfig;
 
 		ImageRGBA8SRGB m_framebuffer = ImageRGBA8SRGB(10, 10);
 	public:
-		Renderer() {}
-		Renderer(SceneConfig sceneConfig) :m_sceneConfig(sceneConfig) {}
+		Renderer2S() {}
+		Renderer2S(SceneConfig sceneConfig) :m_sceneConfig(sceneConfig) {}
 		void setConfig() {}
 		void draw(const Scene& scene);
 		/** Write out the current framebuffer (i.e. the pixels drawn) to a PNG file.*/
