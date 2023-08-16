@@ -182,12 +182,17 @@ namespace lnpz{
 		void addPolygonFace(const polygonface_t& pf);
 
 		Scene build() const;
+
+		//Scene FromJson(const std::string& str);
 	};
+
 
 	struct SceneConfig {
 		RGBAFloat32 background = RGBAFloat32::White();
 		uint32_t outputHeightPixels = 256;
 		uint32_t paddingInPixels = 10; // padding around scene - is not added to output size but scene is contracted
+
+		//static SceneConfig FromJson(const std::string& str);
 	};
 
 

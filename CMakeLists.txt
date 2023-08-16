@@ -9,7 +9,7 @@ add_executable(
 	samples/lnpz-sample.cpp 
 	lnpz/lnpz_fieldquadtree.cpp
 	lnpz/lnpz_util.cpp
-	lnpz/lnpz.cpp
+	lnpz/lnpz2d.cpp
 	lnpz/clipper.cpp
 )
 
@@ -37,7 +37,7 @@ add_executable(
 	test/test.cpp
 	lnpz/lnpz_fieldquadtree.cpp
 	lnpz/lnpz_util.cpp
-	lnpz/lnpz.cpp
+	lnpz/lnpz2d.cpp
 	lnpz/clipper.cpp
 )
 

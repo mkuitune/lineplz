@@ -31,11 +31,13 @@
 //
 // For more information, please refer to <http://unlicense.org/>
 
-#include <lnpz/lnpz.h>
+#include <lnpz/lnpz2d.h>
 
 #include "lnpz_util.h"
 #include "lnpz_fieldquadtree.h"
 #include "clipper.hpp"
+
+#include "nlohmann/json.hpp"
 
 #include <vector>
 #include <filesystem>
@@ -1212,6 +1214,10 @@ namespace lnpz {
 			return m_scene;
 		}
 
+		//Scene SimpleBuilder::FromJson(const std::string& str)
+		//{
+		//}
+
 		//
 		// Renderer
 		//
@@ -1229,9 +1235,13 @@ namespace lnpz {
 			const int32_t	outputScenePixelHeight = outputPixelHeight - 2 * m_sceneConfig.paddingInPixels;
 			const auto		sceneToPixelScale = outputScenePixelHeight / sceneHeight;
 			const int32_t	outputPixelWidth = (int32_t)(sceneToPixelScale * sceneWidth) + (int32_t)(2 * m_sceneConfig.paddingInPixels);
-			const point2_t	sceneOrig(m_sceneConfig.paddingInPixels);
-			const auto		offset = sceneOrig - wb.min();
+			const point2_t	sceneOrigInPixel(m_sceneConfig.paddingInPixels);
+			const auto		wbOriginPixelUnits = wb.min() * sceneToPixelScale;
+			const auto		offset = sceneOrigInPixel - wbOriginPixelUnits;
 
+			//matrix33_t sceneToPixel = { {sceneToPixelScale, 0, offset.x},
+			//							{0,sceneToPixelScale,  offset.y},
+			//							{0, 0, 1} };
 			matrix33_t sceneToPixel = { {sceneToPixelScale, 0, offset.x},
 										{0,sceneToPixelScale,  offset.y},
 										{0, 0, 1} };
