@@ -35,10 +35,11 @@
 
 #include "lnpz_util.h"
 #include "lnpz_fieldquadtree.h"
-#include "clipper.hpp"
 
 #include "nlohmann/json.hpp"
 
+//#include <clipper.hpp>
+#include <clipper2/clipper.h>
 #include <vector>
 #include <filesystem>
 #include <iostream>
@@ -1001,29 +1002,31 @@ namespace lnpz {
 		/* Clean up polygon wires using clipper */
 		struct polygon2d_cleaner_t {
 
-			ClipperLib::Paths outerWires;
-			ClipperLib::Paths innerWires;
+			//Clipper2Lib::PathsD outerWires;
+			//Clipper2Lib::PathsD innerWires;
+			Clipper2Lib::Paths64 outerWires;
+			Clipper2Lib::Paths64 innerWires;
 
 			double scale;
 			point2_t offset;
 
 			static constexpr double INTEGERDIM = 1e6;
 
-			ClipperLib::IntPoint toClipper(const point2_t& pnt) const {
+			Clipper2Lib::Point64  toClipper(const point2_t& pnt) const {
 				auto p = (pnt - offset) * scale;
 				int x = p.x; int y = p.y;
 				return { x,y };
 			}
 			
-			point2_t fromClipper(const ClipperLib::IntPoint& ipnt) const {
+			point2_t fromClipper(const Clipper2Lib::Point64& ipnt) const {
 				point2_t pnt;
-				pnt.x = ipnt.X;
-				pnt.y= ipnt.Y;
+				pnt.x = ipnt.x;
+				pnt.y= ipnt.y;
 				pnt = (pnt / scale) + offset;
 				return pnt;
 			}
 
-			linestring_t linestringFromWire(const ClipperLib::Path& wire) const {
+			linestring_t linestringFromWire(const Clipper2Lib::Path64& wire) const {
 				linestring_t ls;
 				for (const auto& p : wire) {
 					ls.points.push_back(fromClipper(p));
@@ -1032,10 +1035,13 @@ namespace lnpz {
 			}
 
 			// Clean set of inner or outerwires 
-			static ClipperLib::Paths CleanWires(const ClipperLib::Paths& wiresIn) {
-				using namespace ClipperLib;
-				Paths output;
-				SimplifyPolygons(wiresIn, output, pftNonZero);
+			static Clipper2Lib::Paths64 CleanWires(const Clipper2Lib::Paths64& wiresIn) {
+				using namespace Clipper2Lib;
+				Paths64 output;
+				output = wiresIn;
+				// TODO Figure out what to do with this. Clipper2 has no longer polygon cleanup
+				// Douglas-Pecker algorithm would remove line spans
+				//SimplifyPolygon(wiresIn, output, pftNonZero);
 				return output;
 			}
 
@@ -1048,7 +1054,7 @@ namespace lnpz {
 				offset = rec.min();
 
 				for (const auto& ow : edgeFaces.outerWires) {
-					ClipperLib::Path cow;
+					Clipper2Lib::Path64 cow;
 					for (const auto& p : ow) {
 						cow.push_back(toClipper(edgeFaces.vertices[p.fst]));
 					}
@@ -1056,7 +1062,7 @@ namespace lnpz {
 				}
 				
 				for (const auto& iw : edgeFaces.innerWires) {
-					ClipperLib::Path ciw;
+					Clipper2Lib::Path64 ciw;
 					for (const auto& p : iw) {
 						ciw.push_back(toClipper(edgeFaces.vertices[p.fst]));
 					}
@@ -1070,13 +1076,14 @@ namespace lnpz {
 			}
 
 			void cleanAndWrite(renderablepolygonface_t& res) {
-				using namespace ClipperLib;
-				Clipper c;
-				c.AddPaths(outerWires, ptSubject, true);
-				c.AddPaths(innerWires, ptClip, true);
+				using namespace Clipper2Lib;
+				Clipper64 c;
+				c.AddSubject(outerWires);
+				c.AddClip(innerWires);
 				//c.Execute(ctIntersection, solution, pftNonZero, pftNonZero);
-				Paths solution;
-				c.Execute(ctDifference, solution, pftNonZero, pftNonZero);
+				Paths64 solution;
+				//c.Execute(ctDifference, solution, pftNonZero, pftNonZero);
+				c.Execute(ClipType::Difference, FillRule::NonZero, solution);
 
 				// get inner and outerwires from solution
 				for (auto& solpath : solution) {

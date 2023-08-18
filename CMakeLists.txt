@@ -4,15 +4,17 @@ project(lineplz-sample VERSION 1)
 
 set(CMAKE_CXX_STANDARD 17)
 
+add_subdirectory(lnpz/Clipper2/CPP)
+
 add_executable(
 	sample 
 	samples/lnpz-sample.cpp 
 	lnpz/lnpz_fieldquadtree.cpp
 	lnpz/lnpz_util.cpp
 	lnpz/lnpz2d.cpp
-	lnpz/clipper.cpp
+	#lnpz/clipper.cpp
 )
-
+target_link_libraries(sample Clipper2)
 target_include_directories(sample PUBLIC "lnpz/include/")
 set_target_properties(sample PROPERTIES CXX_EXTENSIONS OFF)
 
@@ -38,7 +40,7 @@ add_executable(
 	lnpz/lnpz_fieldquadtree.cpp
 	lnpz/lnpz_util.cpp
 	lnpz/lnpz2d.cpp
-	lnpz/clipper.cpp
+	
 )
 
 target_include_directories(unittester PUBLIC "lnpz/include/")
@@ -46,6 +48,7 @@ target_include_directories(unittester PUBLIC "lnpz/include/")
 target_link_libraries(
 	unittester	
 	gtest_main
+	Clipper2
 )
 
 include(GoogleTest)
