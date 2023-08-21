@@ -1199,6 +1199,12 @@ namespace lnpz {
 			m_scene.m_instances.push_back({ trf, m_currentMaterial, InstanceType::LineString, idx });
 		}
 
+		void SimpleBuilder::addPolygonFaces(const std::vector<polygonface_t>& pfs) {
+			for (auto& pf : pfs) {
+				addPolygonFace(pf);
+			}
+		}
+
 		void SimpleBuilder::addPolygonFace(const polygonface_t& pf) {
 			renderablepolygonface_t renderable;
 

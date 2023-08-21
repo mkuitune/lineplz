@@ -180,6 +180,7 @@ namespace lnpz{
 		void setMaterial(const material_t& mat);
 		void addLineString(const linestring_t& ls);
 		void addPolygonFace(const polygonface_t& pf);
+		void addPolygonFaces(const std::vector<polygonface_t>& pfs);
 
 		Scene build() const;
 

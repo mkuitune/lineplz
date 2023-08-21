@@ -73,4 +73,7 @@ namespace lnpz {
 		std::string PreparePathForWriting(const std::string& pathStr);
 		std::string WriteBytesToPath(const std::vector<uint8_t>& bytes, const std::string& pathStr);
 	}
+
+	std::pair<const unsigned char*, size_t> getDbgFont();
+	
 }

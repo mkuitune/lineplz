@@ -38,6 +38,8 @@
 #include <fstream>
 #include <sstream>
 
+#include "roboto_regular.h"
+
 namespace lnpz {
 
 	namespace util {
@@ -73,6 +75,10 @@ namespace lnpz {
 			return "";
 		}
 
+	}
+	std::pair<const unsigned char*, size_t> getDbgFont()
+	{
+		return std::pair<const unsigned char*, size_t>(Roboto_Regular_ttf, Roboto_Regular_ttf_len);
 	}
 }
 
