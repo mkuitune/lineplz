@@ -107,18 +107,28 @@ namespace lnpz {
 				current.points.push_back({ static_cast<double>(vertices[i].x), static_cast<double>(vertices[i].y) });
 				break;
 
+			//case STBTT_vcurve:
+			//	point2_t P0 = current.points.back();
+			//	point2_t P1 = { static_cast<double>(vertices[i].cx), static_cast<double>(vertices[i].cy) };
+			//	point2_t P2 = { static_cast<double>(vertices[i + 1].x), static_cast<double>(vertices[i + 1].y) };
+
+			//	int n = 4;
+			//	std::vector<point2_t> curvePoints = tessellateBezier(P0, P1, P2, n);
+			//	current.points.insert(current.points.end(), curvePoints.begin(), curvePoints.end());
+
+			//	++i;
+			//	break;
 			case STBTT_vcurve:
 				point2_t P0 = current.points.back();
 				point2_t P1 = { static_cast<double>(vertices[i].cx), static_cast<double>(vertices[i].cy) };
-				point2_t P2 = { static_cast<double>(vertices[i + 1].x), static_cast<double>(vertices[i + 1].y) };
+				point2_t P2 = { static_cast<double>(vertices[i].x), static_cast<double>(vertices[i].y) };  // Use the current vertex as the end point
 
-				int n = 4;
+				int n = 10;
 				std::vector<point2_t> curvePoints = tessellateBezier(P0, P1, P2, n);
 				current.points.insert(current.points.end(), curvePoints.begin(), curvePoints.end());
 
-				++i;
+				// Do not increment i here
 				break;
-
 				// ... (handle other vertex types if needed)
 			}
 		}
