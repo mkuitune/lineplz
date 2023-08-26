@@ -83,6 +83,9 @@ namespace lnpz {
 		static RGBAFloat32 Transparent() { return{ 0.f, 0.f, 0.f, 0.f }; }
 
 		static RGBAFloat32 Red() { return{ 1.f, 0.f, 0.f, 1.f }; }
+		static RGBAFloat32 VenetianRed() { return{ 0.577581, 0.00242821, 0.00749903, 1.f }; }
+	
+
 		static RGBAFloat32 Green() { return{ 0.f, 1.f, 0.f, 1.f }; }
 		static RGBAFloat32 Blue() { return{ 0.f, 0.f, 1.f, 1.f }; }
 		static RGBAFloat32 Cyan() { return{ 0.f, 1.f, 1.f, 1.f }; }
@@ -92,8 +95,8 @@ namespace lnpz {
 		static RGBAFloat32 Black() { return{ 0.f, 0.f, 0.f, 1.f }; }
 		static RGBAFloat32 White() { return{ 1.f, 1.f, 1.f, 1.f }; }
 		static RGBAFloat32 Orange() { return{ 1.f, 0.65f, 0.f, 1.f }; }
-		static RGBAFloat32 Navy() { return{ 0.f, 0.0f, 0.502f, 1.f }; }
+		static RGBAFloat32 Navy() { return{ 0., 0., 0.215861, 1.f }; }
 
-		static RGBAFloat32 Pink() { return{ 1.f, 105.f / 255.f, 180.f / 255.f, 1.f }; } // Actually HotPink...
+		static RGBAFloat32 Pink() { return{ 1.f, 0.527f, 0.597f, 1.f }; } 
 	};
 }

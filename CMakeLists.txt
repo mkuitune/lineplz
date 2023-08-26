@@ -4,6 +4,12 @@ project(lineplz-sample VERSION 1)
 
 set(CMAKE_CXX_STANDARD 17)
 
+if (MSVC)
+    # Set compiler flags to generate PDB files in Release mode
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi")
+    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
+endif()
+
 add_subdirectory(lnpz/Clipper2/CPP)
 
 add_executable(
@@ -17,7 +23,9 @@ add_executable(
 target_link_libraries(sample Clipper2)
 target_include_directories(sample PUBLIC "lnpz/include/")
 set_target_properties(sample PROPERTIES CXX_EXTENSIONS OFF)
-
+if (MSVC)
+set_target_properties(sample PROPERTIES LINK_FLAGS "/PROFILE")
+endif()
 #
 #Testing
 #

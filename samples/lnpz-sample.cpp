@@ -11,12 +11,18 @@
 namespace lnpz {
 
 
-	void simpleOut(const Scene& scene, const std::string& name, RGBAFloat32 back, int height) {
-		SceneConfig sceneConfig;
+	void AdaptiveOut(const Scene& scene, const std::string& name, RGBAFloat32 back, int height) {
+		SceneConfigAdaptive sceneConfig;
 		sceneConfig.background = back;
 		sceneConfig.outputHeightPixels = height;
 		sceneConfig.paddingInPixels = 50;
 
+		Renderer2S renderer(sceneConfig);
+		renderer.draw(scene);
+		renderer.write(name);
+	}
+
+	void FixedOut(const Scene& scene, const std::string& name, SceneConfigFixed sceneConfig) {
 		Renderer2S renderer(sceneConfig);
 		renderer.draw(scene);
 		renderer.write(name);
@@ -307,7 +313,7 @@ void testFont() {
 
 	material_t mat;
 	mat.lineColor = RGBAFloat32::Black();
-	mat.faceColor = RGBAFloat32::Red();
+	mat.faceColor = RGBAFloat32::VenetianRed();
 	mat.lineWidth = 1.5f;
 
 	//GlyphPoly gp = GetFontDataString("The spry fox runs.");
@@ -319,7 +325,7 @@ void testFont() {
 		builder.addPolygonFaces(gp.polyfaces);
 		Scene scene = builder.build();
 
-		simpleOut(scene, "testFont.png", RGBAFloat32::White(), 256);
+		AdaptiveOut(scene, "testFont.png", RGBAFloat32::White(), 256);
 	}
 	{
 		GlyphPoly gp = GetFontData('g');
@@ -329,7 +335,7 @@ void testFont() {
 		builder.addPolygonFaces(gp.polyfaces);
 		Scene scene = builder.build();
 
-		simpleOut(scene, "testFont2.png", RGBAFloat32::White(), 256);
+		AdaptiveOut(scene, "testFont2.png", RGBAFloat32::White(), 256);
 	}
 	{
 		GlyphPoly gp = GetFontData('B');
@@ -339,7 +345,7 @@ void testFont() {
 		builder.addPolygonFaces(gp.polyfaces);
 		Scene scene = builder.build();
 
-		simpleOut(scene, "testFont3.png", RGBAFloat32::White(), 256);
+		AdaptiveOut(scene, "testFont3.png", RGBAFloat32::White(), 256);
 	}
 	{
 		GlyphPoly gp = GetFontData('e');
@@ -349,7 +355,7 @@ void testFont() {
 		builder.addPolygonFaces(gp.polyfaces);
 		Scene scene = builder.build();
 		WriteSvg(gp.polyfaces, "e.svg");;
-		simpleOut(scene, "testFont4.png", RGBAFloat32::White(), 256);
+		AdaptiveOut(scene, "testFont4.png", RGBAFloat32::White(), 256);
 	}
 	{
 		GlyphPoly gp = GetFontDataString("The spry fox.");
@@ -359,7 +365,7 @@ void testFont() {
 		builder.addPolygonFaces(gp.polyfaces);
 		Scene scene = builder.build();
 
-		simpleOut(scene, "testFont5.png", RGBAFloat32::White(), 256);
+		AdaptiveOut(scene, "testFont5.png", RGBAFloat32::White(), 256);
 	}
 	auto c1 = mk::circ(100,100, 100);
 	auto c2 = mk::circ(100, 100, 90);
@@ -372,12 +378,29 @@ void testFont() {
 		builder.addPolygonFace(pf);
 		Scene scene = builder.build();
 
-		simpleOut(scene, "testFontRef.png", RGBAFloat32::White(), 256);
+		AdaptiveOut(scene, "testFontRef.png", RGBAFloat32::White(), 256);
 	}
 
 }
 
+void positionScene() {
+	using namespace lnpz;
+	SimpleBuilder builder;
+	material_t mat;
+	mat.lineColor = RGBAFloat32::Black();
+	mat.faceColor = RGBAFloat32::Red();
+	mat.lineWidth = 1.5f;
+	builder.setMaterial(mat);
 
+	std::vector<linestring_t> inner = { {{{0.8,0.2},{0.2,0.2},{0.5,0.8}}} };
+
+	linestring_t outer = { {{0,0},{1,0}, {1,1}, {0,1}} };
+	outer = outer.reversed();
+	builder.addPolygonFace({ outer,inner });
+	Scene scene = builder.build();
+
+	AdaptiveOut(scene, "positionScene.png", RGBAFloat32::White(), 256);
+}
 
 void drawSquare() {
 	using namespace lnpz;
@@ -395,7 +418,7 @@ void drawSquare() {
 	builder.addPolygonFace({ outer,inner});
 	Scene scene = builder.build();
 
-	simpleOut(scene, "square.png", RGBAFloat32::White(), 256);
+	AdaptiveOut(scene, "square.png", RGBAFloat32::White(), 256);
 }
 
 void dots1() {
@@ -429,7 +452,7 @@ void dots1() {
 
 	Scene scene = builder.build();
 
-	simpleOut(scene, "dots1.png", RGBAFloat32::White(), 756);
+	AdaptiveOut(scene, "dots1.png", RGBAFloat32::White(), 756);
 }
 
 void rects1() {
@@ -463,7 +486,7 @@ void rects1() {
 
 	Scene scene = builder.build();
 
-	SceneConfig sceneConfig;
+	SceneConfigAdaptive sceneConfig;
 	sceneConfig.background = RGBAFloat32::White();
 	sceneConfig.outputHeightPixels = 782;
 	//sceneConfig.paddingInPixels = 32;

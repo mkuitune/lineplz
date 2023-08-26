@@ -1237,6 +1237,19 @@ namespace lnpz {
 		typedef Array2D<RGBAFloat32> ImageRGBA32Linear;
 
 		void Renderer2S::draw(const Scene& scene) {
+			if (m_configType == ConfigType::Adaptive) {
+				drawAdaptive(scene);
+			}
+			else if(m_configType == ConfigType::Fixed)
+			{
+				drawFixed(scene);
+			}
+		}
+
+		void Renderer2S::drawFixed(const Scene& scene) {
+		}
+
+		void Renderer2S::drawAdaptive(const Scene& scene) {
 
 			// Figure out framebuffer size and scene to framebuffer transform
 			const auto wb = scene.getWorldBounds();
@@ -1244,11 +1257,11 @@ namespace lnpz {
 			const auto sceneWidth = diag.x;
 			const auto sceneHeight = diag.y;
 
-			const int32_t	outputPixelHeight = m_sceneConfig.outputHeightPixels;
-			const int32_t	outputScenePixelHeight = outputPixelHeight - 2 * m_sceneConfig.paddingInPixels;
+			const int32_t	outputPixelHeight = m_sceneConfigAdaptive.outputHeightPixels;
+			const int32_t	outputScenePixelHeight = outputPixelHeight - 2 * m_sceneConfigAdaptive.paddingInPixels;
 			const auto		sceneToPixelScale = outputScenePixelHeight / sceneHeight;
-			const int32_t	outputPixelWidth = (int32_t)(sceneToPixelScale * sceneWidth) + (int32_t)(2 * m_sceneConfig.paddingInPixels);
-			const point2_t	sceneOrigInPixel(m_sceneConfig.paddingInPixels);
+			const int32_t	outputPixelWidth = (int32_t)(sceneToPixelScale * sceneWidth) + (int32_t)(2 * m_sceneConfigAdaptive.paddingInPixels);
+			const point2_t	sceneOrigInPixel(m_sceneConfigAdaptive.paddingInPixels);
 			const auto		wbOriginPixelUnits = wb.min() * sceneToPixelScale;
 			const auto		offset = sceneOrigInPixel - wbOriginPixelUnits;
 
@@ -1264,11 +1277,24 @@ namespace lnpz {
 			// Rasterize in 4-byte floating point precision
 
 			ImageRGBA32Linear framebuffer = ImageRGBA32Linear(outputPixelWidth, outputPixelHeight);
-			framebuffer.fill(m_sceneConfig.background);
+			framebuffer.fill(m_sceneConfigAdaptive.background);
 
 			// Rasterize scene instances in order
 			for (const auto& inst : scene.m_instances) {
 				internal_detail::RasterizeInstance(scene, sceneToPixel, inst, framebuffer);
+			}
+
+			// Convert to 1 byte per channel SRGBA
+			m_framebuffer = ConvertRBGA32LinearToSrgba(framebuffer);
+		}
+
+		void Renderer2S::drawCommon(const drawconfig_t& dc, const Scene& scene) {
+			ImageRGBA32Linear framebuffer = ImageRGBA32Linear(dc.outputPixelWidth, dc.outputPixelHeight);
+			framebuffer.fill(dc.background);
+
+			// Rasterize scene instances in order
+			for (const auto& inst : scene.m_instances) {
+				internal_detail::RasterizeInstance(scene, dc.sceneToPixel, inst, framebuffer);
 			}
 
 			// Convert to 1 byte per channel SRGBA
@@ -1301,6 +1327,7 @@ namespace lnpz {
 		namespace internal_detail {
 			uint8_t LinearFloatToSRGBUint8(const float f) {
 				return stbir__linear_to_srgb_uchar(f);
+				//return f * 255.0;
 			}
 
 

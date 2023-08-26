@@ -1,3 +1,4 @@
 
 [] SimpleScene::FromJson
 [] SimpleBuilder::FromJson
+[] Fixed domain to render area map

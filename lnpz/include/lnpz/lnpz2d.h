@@ -191,26 +191,54 @@ namespace lnpz{
 	struct SceneConfig {
 		RGBAFloat32 background = RGBAFloat32::White();
 		uint32_t outputHeightPixels = 256;
-		uint32_t paddingInPixels = 10; // padding around scene - is not added to output size but scene is contracted
-
-		//static SceneConfig FromJson(const std::string& str);
 	};
 
+	struct SceneConfigAdaptive : public SceneConfig{
+		uint32_t paddingInPixels = 10; // padding around scene - is not added to output size but scene is contracted
+		//static SceneConfigAdaptive FromJson(const std::string& str);
+	};
+
+	struct SceneConfigFixed : public SceneConfig{
+		uint32_t outputWidthPixels = 256;
+		float viewSceneWidth; // how wide the view is in scene units
+		point2_t viewOriginInScene; // left corner of view in scene coordinates
+		//static SceneConfigFixed FromJson(const std::string& str);
+	};
+
+	enum class ConfigType {Adaptive, Fixed};
 
 	// Renderer2S - 2D software renderer
 	class Renderer2S {
-		SceneConfig m_sceneConfig;
+
+		ConfigType m_configType = ConfigType::Adaptive;
+
+		SceneConfigAdaptive m_sceneConfigAdaptive;
+		SceneConfigFixed m_sceneConfigFixed;
+
+		struct drawconfig_t {
+			int32_t outputPixelWidth;
+			int32_t outputPixelHeight;
+			RGBAFloat32 background;
+			matrix33_t sceneToPixel;
+		};
 
 		ImageRGBA8SRGB m_framebuffer = ImageRGBA8SRGB(10, 10);
 	public:
 		Renderer2S() {}
-		Renderer2S(SceneConfig sceneConfig) :m_sceneConfig(sceneConfig) {}
+		Renderer2S(SceneConfigAdaptive sceneConfig) 
+			:m_sceneConfigAdaptive(sceneConfig), m_configType(ConfigType::Adaptive) {}
+		Renderer2S(SceneConfigFixed sceneConfig)
+			:m_sceneConfigFixed(sceneConfig), m_configType(ConfigType::Fixed) {}
 		void setConfig() {}
 		void draw(const Scene& scene);
 		/** Write out the current framebuffer (i.e. the pixels drawn) to a PNG file.*/
 		std::string write(const std::string& pathOut) const;
 		/** Return byte array of the current framebuffer (i.e. the pixels drawn).*/
 		std::string getSRGBABytes() const;
+	private:
+		void drawFixed(const Scene& scene);
+		void drawAdaptive(const Scene& scene);
+		void drawCommon(const drawconfig_t& dc, const Scene& scene);
 	};
 
 }
