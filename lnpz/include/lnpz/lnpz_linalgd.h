@@ -1307,6 +1307,7 @@ namespace lnpz_linalg {
 
 		const pnt_t& min() const noexcept { return minpoint; }
 		const pnt_t& max() const noexcept { return MAXpoint; }
+        const pnt_t center() const noexcept { return (MAXpoint + minpoint)*0.5; }
 
 		bool valid() const noexcept {
 			return elementsLargerThanOrEqual(MAXpoint, minpoint);

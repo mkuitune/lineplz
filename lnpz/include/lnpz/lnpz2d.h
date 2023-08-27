@@ -202,6 +202,46 @@ namespace lnpz{
 		uint32_t outputWidthPixels = 256;
 		float viewSceneWidth; // how wide the view is in scene units
 		point2_t viewOriginInScene; // left corner of view in scene coordinates
+
+		float viewSceneHeight() const{ 
+			double h = outputHeightPixels;
+			double w = outputWidthPixels;
+			return (h / w) * viewSceneWidth;
+		}
+
+		static SceneConfigFixed FitSceneToCenter(rectangle_t sceneBounds, int pixelMargin, int pixelWidth, int pixelHeight) {
+
+			// if margin is too large just set it to 0
+			auto minpixdim = std::min(pixelHeight, pixelWidth);
+			if (minpixdim <= 2 * pixelMargin) {
+				pixelMargin = 0;
+			}
+
+			float pixelwc = pixelWidth - 2 * pixelMargin;
+			float pixelhc = pixelHeight - 2 * pixelMargin;
+			// the area to which to fit the data
+			float aspectPixel = pixelwc / pixelhc;
+			auto scenediag = sceneBounds.diagonal();
+			float aspectScene = scenediag.x / scenediag.y;
+			float scale;
+			if (aspectPixel > aspectScene) { // fit h
+				scale = scenediag.y / pixelhc;
+			}
+			else { // fit w
+				scale = scenediag.x / pixelwc;
+			}
+
+			SceneConfigFixed cfg;
+			cfg.outputHeightPixels = pixelHeight;
+			cfg.outputWidthPixels = pixelWidth;
+			cfg.viewSceneWidth = scale * pixelWidth;
+
+			auto cent = sceneBounds.center();
+			lnpz_linalg::double2 viewOffset = { 0.5 * cfg.viewSceneWidth, 0.5 * cfg.viewSceneHeight()};
+			cfg.viewOriginInScene = cent - viewOffset;
+			return cfg;
+		}
+
 		//static SceneConfigFixed FromJson(const std::string& str);
 	};
 
@@ -212,6 +252,7 @@ namespace lnpz{
 
 		ConfigType m_configType = ConfigType::Adaptive;
 
+		SceneConfig m_activeConfig;
 		SceneConfigAdaptive m_sceneConfigAdaptive;
 		SceneConfigFixed m_sceneConfigFixed;
 
@@ -226,9 +267,13 @@ namespace lnpz{
 	public:
 		Renderer2S() {}
 		Renderer2S(SceneConfigAdaptive sceneConfig) 
-			:m_sceneConfigAdaptive(sceneConfig), m_configType(ConfigType::Adaptive) {}
+			:m_sceneConfigAdaptive(sceneConfig), m_configType(ConfigType::Adaptive) {
+			m_activeConfig = m_sceneConfigAdaptive;
+		}
 		Renderer2S(SceneConfigFixed sceneConfig)
-			:m_sceneConfigFixed(sceneConfig), m_configType(ConfigType::Fixed) {}
+			:m_sceneConfigFixed(sceneConfig), m_configType(ConfigType::Fixed) {
+			m_activeConfig = m_sceneConfigFixed;
+		}
 		void setConfig() {}
 		void draw(const Scene& scene);
 		/** Write out the current framebuffer (i.e. the pixels drawn) to a PNG file.*/

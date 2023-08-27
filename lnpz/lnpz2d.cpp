@@ -1247,6 +1247,27 @@ namespace lnpz {
 		}
 
 		void Renderer2S::drawFixed(const Scene& scene) {
+			const auto wb = scene.getWorldBounds();
+			const auto sceneWidth = m_sceneConfigFixed.viewSceneWidth;
+			const auto sceneHeight = m_sceneConfigFixed.viewSceneHeight();
+
+			drawconfig_t dc;
+			dc.background = m_sceneConfigFixed.background;
+			dc.outputPixelHeight = m_sceneConfigFixed.outputHeightPixels;
+			const auto	sceneToPixelScale = ((float)m_sceneConfigFixed.outputWidthPixels )/ m_sceneConfigFixed.viewSceneWidth;
+			dc.outputPixelWidth = m_sceneConfigFixed.outputWidthPixels;
+
+			const point2_t	sceneOrigInPixel = m_sceneConfigFixed.viewOriginInScene * sceneToPixelScale;
+
+			const auto		wbOriginPixelUnits = wb.min() * sceneToPixelScale;
+			//const auto		offset = sceneOrigInPixel - wbOriginPixelUnits;
+			const auto	offset = -sceneOrigInPixel;
+
+			dc.sceneToPixel = { {sceneToPixelScale, 0, offset.x},
+										{0,sceneToPixelScale,  offset.y},
+										{0, 0, 1} };
+			dc.sceneToPixel = lnpz_linalg::transpose(dc.sceneToPixel); // row to column major
+			drawCommon(dc, scene);
 		}
 
 		void Renderer2S::drawAdaptive(const Scene& scene) {
@@ -1257,35 +1278,21 @@ namespace lnpz {
 			const auto sceneWidth = diag.x;
 			const auto sceneHeight = diag.y;
 
-			const int32_t	outputPixelHeight = m_sceneConfigAdaptive.outputHeightPixels;
-			const int32_t	outputScenePixelHeight = outputPixelHeight - 2 * m_sceneConfigAdaptive.paddingInPixels;
+			drawconfig_t dc;
+			dc.background = m_sceneConfigAdaptive.background;
+			dc.outputPixelHeight = m_sceneConfigAdaptive.outputHeightPixels;
+			const int32_t	outputScenePixelHeight = dc.outputPixelHeight - 2 * m_sceneConfigAdaptive.paddingInPixels;
 			const auto		sceneToPixelScale = outputScenePixelHeight / sceneHeight;
-			const int32_t	outputPixelWidth = (int32_t)(sceneToPixelScale * sceneWidth) + (int32_t)(2 * m_sceneConfigAdaptive.paddingInPixels);
+			dc.outputPixelWidth = (int32_t)(sceneToPixelScale * sceneWidth) + (int32_t)(2 * m_sceneConfigAdaptive.paddingInPixels);
 			const point2_t	sceneOrigInPixel(m_sceneConfigAdaptive.paddingInPixels);
 			const auto		wbOriginPixelUnits = wb.min() * sceneToPixelScale;
 			const auto		offset = sceneOrigInPixel - wbOriginPixelUnits;
 
-			//matrix33_t sceneToPixel = { {sceneToPixelScale, 0, offset.x},
-			//							{0,sceneToPixelScale,  offset.y},
-			//							{0, 0, 1} };
-			matrix33_t sceneToPixel = { {sceneToPixelScale, 0, offset.x},
+			dc.sceneToPixel = { {sceneToPixelScale, 0, offset.x},
 										{0,sceneToPixelScale,  offset.y},
 										{0, 0, 1} };
-
-			sceneToPixel = lnpz_linalg::transpose(sceneToPixel); // row to column major
-
-			// Rasterize in 4-byte floating point precision
-
-			ImageRGBA32Linear framebuffer = ImageRGBA32Linear(outputPixelWidth, outputPixelHeight);
-			framebuffer.fill(m_sceneConfigAdaptive.background);
-
-			// Rasterize scene instances in order
-			for (const auto& inst : scene.m_instances) {
-				internal_detail::RasterizeInstance(scene, sceneToPixel, inst, framebuffer);
-			}
-
-			// Convert to 1 byte per channel SRGBA
-			m_framebuffer = ConvertRBGA32LinearToSrgba(framebuffer);
+			dc.sceneToPixel = lnpz_linalg::transpose(dc.sceneToPixel); // row to column major
+			drawCommon(dc, scene);
 		}
 
 		void Renderer2S::drawCommon(const drawconfig_t& dc, const Scene& scene) {

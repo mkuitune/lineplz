@@ -399,6 +399,11 @@ void positionScene() {
 	builder.addPolygonFace({ outer,inner });
 	Scene scene = builder.build();
 
+	SceneConfigFixed fixed = SceneConfigFixed::FitSceneToCenter(scene.getWorldBounds(), 10, 512, 256);
+	fixed.background = RGBAFloat32::White();
+	
+	FixedOut(scene, "positionSceneFixed.png", fixed);
+
 	AdaptiveOut(scene, "positionScene.png", RGBAFloat32::White(), 256);
 }
 
@@ -498,6 +503,7 @@ void rects1() {
 }
 
 int main(int arc, char* argv[]) {
+	positionScene();
 	testFont();
 	drawSquare();
 	dots1();
