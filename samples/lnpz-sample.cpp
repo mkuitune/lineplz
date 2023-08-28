@@ -4,6 +4,7 @@
 #include<map>
 #include<vector>
 #include<fstream>
+#include<functional>
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "../stb/stb_truetype.h"
@@ -11,11 +12,11 @@
 namespace lnpz {
 
 
-	void AdaptiveOut(const Scene& scene, const std::string& name, RGBAFloat32 back, int height) {
+	void AdaptiveOut(const Scene& scene, const std::string& name, RGBAFloat32 back, int height, int padding = 50) {
 		SceneConfigAdaptive sceneConfig;
 		sceneConfig.background = back;
 		sceneConfig.outputHeightPixels = height;
-		sceneConfig.paddingInPixels = 50;
+		sceneConfig.paddingInPixels = padding;
 
 		Renderer2S renderer(sceneConfig);
 		renderer.draw(scene);
@@ -304,8 +305,50 @@ namespace mk {
 		point2_t ph = { 0,h };
 		return { {p,p + pw, p + pw + ph,p + ph} };
 	}
+
+	void grid(lnpz::SimpleBuilder& sb, float w, float h) {
+		using namespace std;
+		using namespace lnpz;
+		material_t linemat;
+		linemat.lineColor = RGBAFloat32::Grey();
+		sb.setMaterial(linemat);
+		float xd = 1.0f;
+		float yd = 1.0f;
+		for (float x = 0; x < w; x+=xd) {
+			sb.addLineString({ {{x,0},{x,h}} });
+		}
+		for (float y = 0; y < h; y += yd) {
+			sb.addLineString({ {{0,y},{w,y}} });
+		}
+	}
+
+	std::vector<lnpz::point2_t> plot(float x0, float x1, std::function<float(float)> f, float dx = 0.1f) {
+		std::vector<lnpz::point2_t> res;
+		for (float x = x0; x <= x1; x += dx) {
+			res.push_back({x, f(x)});
+		}
+		return res;
+	}
 }
 
+void testGrid() {
+	using namespace lnpz;
+	SimpleBuilder b;
+	mk::grid(b, 10.f, 10.f);
+	auto plot1 = mk::plot(0.f, 10.f, [](float x) {return 0.1 * x * x;});
+	auto plot2 = mk::plot(0.f, 10.f, [](float x) {return x; });
+	material_t pm1;
+	pm1.lineWidth = 2.0;
+	pm1.lineColor = RGBAFloat32::Turquoise();
+	b.setMaterial(pm1);
+	b.addLineString({ plot1 });
+	material_t pm2 = pm1;
+	pm2.lineColor = RGBAFloat32::VenetianRed();
+	b.setMaterial(pm2);
+	b.addLineString({ plot2 });
+	Scene scene = b.build();
+	AdaptiveOut(scene, "testGrid.png", RGBAFloat32::Black(), 768, 10);
+}
 
 
 void testFont() {
@@ -503,6 +546,7 @@ void rects1() {
 }
 
 int main(int arc, char* argv[]) {
+	testGrid();
 	positionScene();
 	testFont();
 	drawSquare();

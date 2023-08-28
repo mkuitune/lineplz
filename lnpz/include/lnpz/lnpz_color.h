@@ -89,10 +89,14 @@ namespace lnpz {
 		static RGBAFloat32 Green() { return{ 0.f, 1.f, 0.f, 1.f }; }
 		static RGBAFloat32 Blue() { return{ 0.f, 0.f, 1.f, 1.f }; }
 		static RGBAFloat32 Cyan() { return{ 0.f, 1.f, 1.f, 1.f }; }
+		
+		static RGBAFloat32 Turquoise() { return{ 0.051f, 0.745f, 0.630f, 1.f }; }
+
 
 		static RGBAFloat32 Violet() { return{ 1.f, 0.f, 1.f, 1.f }; }
 		static RGBAFloat32 Yellow() { return{ 1.f, 1.f, 0.f, 1.f }; }
 		static RGBAFloat32 Black() { return{ 0.f, 0.f, 0.f, 1.f }; }
+		static RGBAFloat32 Grey() { return{ 0.21f, 0.21f, 0.21f, 1.f }; }
 		static RGBAFloat32 White() { return{ 1.f, 1.f, 1.f, 1.f }; }
 		static RGBAFloat32 Orange() { return{ 1.f, 0.65f, 0.f, 1.f }; }
 		static RGBAFloat32 Navy() { return{ 0., 0., 0.215861, 1.f }; }
