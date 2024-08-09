@@ -13,3 +13,5 @@ samples/lnpz-samples.cpp is the main driver code for the existing test scenes. s
 ## Instructions
 
 It's a cmake project with no external dependencies. You need a C++ compiler and CMake... Tested on Visual Studio, other compilers may or may not work.
+
+This includes Clipper2, nlohmann::json and stb libraries as bundled dependencies.
